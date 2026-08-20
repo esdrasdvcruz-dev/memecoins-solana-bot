@@ -2,7 +2,7 @@
 Bot de análisis diario de memecoins en Solana.
 
 Flujo:
-  1. Descubre tokens candidatos en Solana (DexScreener).
+  1. Descubre tokens candidatos en Solana (DexScreener + Jupiter).
   2. Trae datos de mercado (precio, liquidez, volumen, market cap).
   3. Preselecciona con filtros baratos (liquidez, volumen, edad) para no
      gastar el rate limit de RugCheck en tokens que van a fallar igual.
@@ -10,6 +10,10 @@ Flujo:
      (con RPC de Solana como respaldo si RugCheck no tiene datos).
   5. Aplica todos los filtros de confiabilidad y calcula el score 0-100.
   6. Envía el top N por Telegram.
+
+Si algo revienta a mitad de camino (una API caída, un bug, etc.), se
+manda un aviso de error por Telegram además de quedar registrado en
+data/bot.log, para enterarse sin tener que ir a revisar el log a mano.
 
 Uso manual:   python bot.py
 Uso programado: ver README.md (Programador de tareas de Windows).
@@ -19,11 +23,12 @@ from __future__ import annotations
 
 import logging
 import sys
+import traceback
 
 import config
-from data_sources import dexscreener, rugcheck, solana_rpc
+from data_sources import dexscreener, jupiter, rugcheck, solana_rpc
 from scoring import cheap_prefilter, evaluate_tokens
-from telegram_report import send_report
+from telegram_report import send_error_alert, send_report
 
 _handlers = [logging.FileHandler(config.LOG_FILE, encoding="utf-8")]
 if sys.stdout is not None:
@@ -66,7 +71,10 @@ def run() -> list[dict]:
         )
         sys.exit(1)
 
-    addresses = dexscreener.discover_candidate_addresses()
+    addresses = set(dexscreener.discover_candidate_addresses())
+    addresses.update(jupiter.discover_candidate_addresses())
+    addresses = list(addresses)
+    logger.info("Total de candidatos únicos combinando fuentes: %d", len(addresses))
     if not addresses:
         logger.warning("No se descubrieron tokens candidatos, se aborta esta corrida")
         send_report([])
@@ -91,5 +99,19 @@ def run() -> list[dict]:
     return top_n
 
 
+def main() -> None:
+    try:
+        run()
+    except SystemExit:
+        raise  # salidas controladas (ej. falta configurar .env), no son un "crash"
+    except Exception:
+        logger.exception("Fallo no controlado durante la corrida diaria")
+        try:
+            send_error_alert(traceback.format_exc())
+        except Exception:
+            logger.exception("Además falló el intento de avisar el error por Telegram")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    run()
+    main()

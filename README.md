@@ -5,9 +5,9 @@ confiabilidad (liquidez, autoridad del token, concentración de holders,
 edad, volumen), calcula un score de 0 a 100 por token y envía un reporte
 con el top 10 por Telegram.
 
-**Ya está probado end-to-end con datos reales** (DexScreener, RugCheck, RPC
-de Solana y envío real por Telegram) durante la construcción de este
-proyecto.
+**Ya está probado end-to-end con datos reales** (DexScreener, Jupiter,
+RugCheck, RPC de Solana y envío real por Telegram) durante la construcción
+de este proyecto.
 
 ## ⚠️ Esto no es asesoría financiera
 
@@ -28,6 +28,7 @@ mi-proyecto/
 ├── telegram_report.py        # Formateo y envío del reporte por Telegram
 ├── data_sources/
 │   ├── dexscreener.py        # Descubrimiento de tokens + datos de mercado
+│   ├── jupiter.py            # Descubrimiento adicional (recientes/trending/organic score)
 │   ├── rugcheck.py           # Score de seguridad, holders, mint/freeze authority
 │   └── solana_rpc.py         # Respaldo vía RPC de Solana si RugCheck no tiene el token
 ├── data/
@@ -146,6 +147,10 @@ que los filtros están funcionando, no que el bot esté fallando.
 - **DexScreener** (`data_sources/dexscreener.py`): descubre tokens nuevos o
   con actividad reciente en Solana y trae precio, market cap, liquidez,
   volumen y antigüedad del par.
+- **Jupiter Token API v2** (`data_sources/jupiter.py`): fuente adicional de
+  descubrimiento (tokens recientes, trending 24h y con mejor "organic
+  score"), gratis y sin API key. Amplía bastante el universo de candidatos
+  respecto a usar solo DexScreener (~200+ candidatos en vez de ~50-60).
 - **RugCheck** (`data_sources/rugcheck.py`): score de seguridad, si la
   mint/freeze authority están revocadas, holders totales, concentración del
   top 10 de holders (excluyendo las propias cuentas de los pools de
@@ -154,6 +159,14 @@ que los filtros están funcionando, no que el bot esté fallando.
   RugCheck todavía no indexó un token (usa `getAccountInfo` para
   mint/freeze authority y `getTokenLargestAccounts` para concentración de
   holders).
+
+### Si algo falla a mitad de la corrida
+
+`bot.py` envuelve todo el análisis en un manejo de errores: si cualquier
+paso revienta (una API caída, un bug, etc.), además de quedar el traceback
+completo en `data/bot.log`, te llega un mensaje de Telegram avisando que la
+corrida de hoy falló, con un extracto del error. Así te enteras sin tener
+que ir a revisar el log a mano.
 
 ### Filtros de confiabilidad (se descarta el token si falla cualquiera)
 | Filtro | Umbral por defecto |
@@ -179,6 +192,20 @@ que los filtros están funcionando, no que el bot esté fallando.
   $1M de liquidez.
 
 ## 9. Programar la ejecución diaria a las 8am (Windows)
+
+> **Estado en esta máquina**: la tarea `MemecoinSolanaBot` ya está creada y
+> configurada para correr "pase lo que pase":
+> - Diaria a las 8:00 am, usando `pythonw.exe` (sin ventana de consola).
+> - `LogonType: Password` → corre aunque no hayas iniciado sesión en
+>   Windows.
+> - `StartWhenAvailable` → si el PC estaba apagado/dormido a las 8am, corre
+>   apenas se prenda.
+> - `WakeToRun` → despierta el equipo si está dormido (no si está apagado).
+> - No se detiene por estar en batería, y tiene un límite de 1 hora por si
+>   alguna corrida se cuelga.
+>
+> Los pasos de abajo son por si necesitas recrearla desde cero (otra PC,
+> reinstalación, etc.) o entender qué se configuró.
 
 ### Opción A: interfaz gráfica del Programador de tareas
 
@@ -227,6 +254,30 @@ Para probarla manualmente sin esperar a las 8am:
 ```powershell
 schtasks /Run /TN "MemecoinSolanaBot"
 ```
+
+Para que corra "pase lo que pase" (recuperarse si el PC estaba apagado o
+dormido, no detenerse por batería, etc.), aplica esto una vez con el
+módulo `ScheduledTasks` de PowerShell:
+
+```powershell
+$settings = New-ScheduledTaskSettingsSet `
+    -StartWhenAvailable `
+    -WakeToRun `
+    -DontStopOnIdleEnd `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+
+Set-ScheduledTask -TaskName "MemecoinSolanaBot" -Settings $settings
+```
+
+Y para que corra aunque no hayas iniciado sesión en Windows, ese paso sí
+requiere tu contraseña y **no se puede hacer por línea de comandos de forma
+no interactiva de manera segura** — hazlo desde la interfaz gráfica: clic
+derecho sobre la tarea → Propiedades → pestaña General → marca *"Ejecutar
+tanto si el usuario inició sesión como si no"* → Aceptar → escribe tu
+contraseña de Windows cuando te la pida.
 
 Para eliminarla si algún día ya no la quieres:
 

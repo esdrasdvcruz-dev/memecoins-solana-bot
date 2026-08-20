@@ -117,6 +117,19 @@ def _send_message(text: str, disable_preview: bool = True) -> bool:
         return False
 
 
+def send_error_alert(error_traceback: str) -> None:
+    """Avisa por Telegram que la corrida diaria falló. Se manda un extracto
+    corto del traceback (Telegram limita cada mensaje a 4096 caracteres)."""
+    snippet = error_traceback.strip()[-3000:]
+    text = (
+        "\U0001f6a8 <b>El bot de memecoins falló durante la corrida de hoy</b>\n"
+        "No se pudo generar el reporte. Detalle del error:\n"
+        f"<pre>{html.escape(snippet)}</pre>\n"
+        "Revisa <code>data/bot.log</code> para el traceback completo."
+    )
+    _send_message(text)
+
+
 def send_report(tokens: list[dict]) -> None:
     if not tokens:
         _send_message(
