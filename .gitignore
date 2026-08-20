@@ -1,0 +1,20 @@
+# Credenciales (nunca deben subirse)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Datos y logs generados en tiempo de ejecución (no son código fuente)
+data/history.json
+data/bot.log
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

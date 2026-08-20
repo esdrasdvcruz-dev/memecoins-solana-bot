@@ -1,0 +1,273 @@
+# Bot de Análisis de Memecoins en Solana
+
+Analiza el mercado de memecoins en Solana todos los días, aplica filtros de
+confiabilidad (liquidez, autoridad del token, concentración de holders,
+edad, volumen), calcula un score de 0 a 100 por token y envía un reporte
+con el top 10 por Telegram.
+
+**Ya está probado end-to-end con datos reales** (DexScreener, RugCheck, RPC
+de Solana y envío real por Telegram) durante la construcción de este
+proyecto.
+
+## ⚠️ Esto no es asesoría financiera
+
+Los memecoins son extremadamente volátiles y de alto riesgo. Los filtros de
+este bot reducen el riesgo de rugs obvios, pero **no garantizan nada**. El
+reporte incluye siempre una advertencia de riesgo. Verifica todo por tu
+cuenta antes de invertir un solo dólar.
+
+---
+
+## 1. Estructura del proyecto
+
+```
+mi-proyecto/
+├── bot.py                    # Orquestador principal (python bot.py)
+├── config.py                 # Variables de entorno y umbrales de filtrado
+├── scoring.py                # Filtros de confiabilidad + cálculo del score 0-100
+├── telegram_report.py        # Formateo y envío del reporte por Telegram
+├── data_sources/
+│   ├── dexscreener.py        # Descubrimiento de tokens + datos de mercado
+│   ├── rugcheck.py           # Score de seguridad, holders, mint/freeze authority
+│   └── solana_rpc.py         # Respaldo vía RPC de Solana si RugCheck no tiene el token
+├── data/
+│   ├── history.json          # Historial local (para calcular momentum de holders)
+│   └── bot.log               # Log de cada corrida
+├── requirements.txt
+├── .env                      # Tus credenciales (NO se sube a git)
+├── .env.example               # Plantilla del .env
+└── README.md
+```
+
+Cada archivo de `data_sources/` y `scoring.py`/`telegram_report.py` se puede
+ejecutar solo para probarlo de forma aislada, por ejemplo:
+
+```powershell
+python -m data_sources.dexscreener
+python -m data_sources.rugcheck
+python -m data_sources.solana_rpc
+python scoring.py
+python telegram_report.py
+```
+
+## 2. Requisitos previos
+
+- Python 3.10 o superior instalado y en el PATH (`python --version`).
+- Conexión a internet (todas las APIs usadas son gratuitas y no requieren
+  API key).
+- Una cuenta de Telegram.
+
+## 3. Instalación
+
+Abre PowerShell en la carpeta del proyecto:
+
+```powershell
+cd C:\Users\perri\Documents\mi-proyecto
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+> Si `Activate.ps1` da error de permisos, ejecuta una vez (como usuario
+> normal, no hace falta admin):
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+## 4. Crear el bot de Telegram con BotFather
+
+1. Abre Telegram y busca el usuario **@BotFather** (tiene la insignia de
+   verificado).
+2. Envíale el comando `/newbot`.
+3. Te pedirá un **nombre** para el bot (puede ser cualquier texto, ej.
+   "Mi Memecoin Scanner").
+4. Te pedirá un **username** único que debe terminar en `bot` (ej.
+   `mi_memecoin_scanner_bot`).
+5. BotFather te responde con un mensaje que incluye el **token**, con este
+   formato: `123456789:AAHk...................`. Guárdalo, es la contraseña
+   de tu bot — no lo compartas ni lo subas a un repositorio público.
+
+## 5. Obtener tu chat ID
+
+1. Busca tu bot recién creado por el username que elegiste y presiona
+   **Iniciar / Start** (o mándale cualquier mensaje). Esto es obligatorio:
+   un bot no puede escribirle primero a un usuario que nunca le habló.
+2. Abre esta URL en el navegador, reemplazando `<TOKEN>` por tu token:
+   `https://api.telegram.org/bot<TOKEN>/getUpdates`
+3. Busca en la respuesta JSON el campo `"chat":{"id":...}` — ese número es
+   tu `TELEGRAM_CHAT_ID`.
+   - Alternativa más simple: busca el bot **@userinfobot** en Telegram,
+     mándale un mensaje, y te devuelve tu ID directamente.
+4. Si en vez de a ti quieres que el bot le escriba a un **grupo o canal**,
+   agrégalo ahí, mándale un mensaje mencionando al bot, y repite el paso 2:
+   el chat ID de un grupo/canal es un número negativo que suele empezar con
+   `-100`.
+
+## 6. Configurar el archivo `.env`
+
+Copia la plantilla y edítala:
+
+```powershell
+copy .env.example .env
+notepad .env
+```
+
+Reemplaza:
+
+```
+TELEGRAM_BOT_TOKEN=el_token_que_te_dio_botfather
+TELEGRAM_CHAT_ID=el_id_que_obtuviste_en_el_paso_anterior
+```
+
+Los filtros de confiabilidad (liquidez mínima, holders mínimos, etc.) ya
+vienen con los valores pedidos en el diseño del bot; puedes ajustarlos
+descomentando las líneas correspondientes en `.env` si algún día quieres
+un bot más o menos estricto.
+
+## 7. Ejecutar manualmente
+
+```powershell
+python bot.py
+```
+
+Vas a ver logs en la consola (y guardados en `data/bot.log`) mientras el
+bot descubre tokens, los filtra y calcula el score. Al final, revisa tu
+chat de Telegram: si algún token pasó todos los filtros, recibirás un
+mensaje de cabecera, un mensaje por cada token del top 10, y un mensaje
+final con la advertencia de riesgo. Si ningún token pasó los filtros ese
+día, el bot te avisa igual (no se queda en silencio).
+
+**Nota realista:** en el universo de tokens que expone gratis la API de
+DexScreener (ver limitaciones abajo), es normal y esperable que muchos días
+pasen **menos de 10 tokens** los filtros, o incluso ninguno — eso significa
+que los filtros están funcionando, no que el bot esté fallando.
+
+## 8. Cómo funciona el análisis
+
+### Fuentes de datos
+- **DexScreener** (`data_sources/dexscreener.py`): descubre tokens nuevos o
+  con actividad reciente en Solana y trae precio, market cap, liquidez,
+  volumen y antigüedad del par.
+- **RugCheck** (`data_sources/rugcheck.py`): score de seguridad, si la
+  mint/freeze authority están revocadas, holders totales, concentración del
+  top 10 de holders (excluyendo las propias cuentas de los pools de
+  liquidez) y % de liquidez bloqueada/quemada.
+- **RPC de Solana** (`data_sources/solana_rpc.py`): respaldo cuando
+  RugCheck todavía no indexó un token (usa `getAccountInfo` para
+  mint/freeze authority y `getTokenLargestAccounts` para concentración de
+  holders).
+
+### Filtros de confiabilidad (se descarta el token si falla cualquiera)
+| Filtro | Umbral por defecto |
+|---|---|
+| Liquidez | ≥ $50,000 USD |
+| Liquidez bloqueada/quemada | ≥ 80% |
+| Mint authority | Revocada |
+| Freeze authority | Revocada |
+| Top 10 holders | ≤ 30% del supply |
+| Edad del par | ≥ 24 horas |
+| Holders totales | ≥ 500 |
+| Volumen 24h | ≥ $100,000 USD |
+| Marcado como "rugged" por RugCheck | Excluido siempre |
+
+### Score (0-100)
+- **40% Seguridad**: score de riesgo de RugCheck, invertido (100 = más
+  seguro).
+- **30% Momentum**: promedio de (a) aceleración del volumen de la última
+  hora comparado contra el promedio diario, y (b) crecimiento del número de
+  holders desde la corrida anterior del bot (usa `data/history.json` como
+  memoria local del día anterior).
+- **30% Liquidez**: escala logarítmica entre el mínimo exigido ($50k) y
+  $1M de liquidez.
+
+## 9. Programar la ejecución diaria a las 8am (Windows)
+
+### Opción A: interfaz gráfica del Programador de tareas
+
+1. Abre el menú Inicio, escribe **"Programador de tareas"** y ábrelo.
+2. En el panel derecho, clic en **"Crear tarea básica..."**.
+3. **Nombre**: `Memecoin Solana Bot Diario` → Siguiente.
+4. **Desencadenador**: `Diariamente` → Siguiente → hora de inicio
+   **08:00:00**, repetir cada 1 día → Siguiente.
+5. **Acción**: `Iniciar un programa` → Siguiente.
+6. **Programa o script**: pega la ruta a `pythonw.exe` (así corre en segundo
+   plano sin abrir ninguna ventana):
+   ```
+   C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe
+   ```
+7. **Agregar argumentos**:
+   ```
+   C:\Users\perri\Documents\mi-proyecto\bot.py
+   ```
+8. **Iniciar en (opcional)**:
+   ```
+   C:\Users\perri\Documents\mi-proyecto
+   ```
+9. Siguiente → Finalizar.
+10. Busca la tarea recién creada en la lista, clic derecho →
+    **Propiedades**. En la pestaña **General**, marca *"Ejecutar tanto si
+    el usuario inició sesión como si no"* si quieres que corra aunque no
+    hayas iniciado sesión en Windows a esa hora (te pedirá tu contraseña de
+    Windows una vez para guardarlo).
+11. En la pestaña **Condiciones**, si usas laptop, puedes desmarcar
+    *"Iniciar la tarea solo si el equipo está conectado a la corriente"*.
+
+Para confirmar que quedó bien configurada, selecciónala en la lista y haz
+clic en **"Ejecutar"** — revisa tu Telegram y el archivo `data/bot.log`.
+
+### Opción B: una sola línea en PowerShell (`schtasks`)
+
+Alternativa más rápida a los pasos de arriba, ejecutada una sola vez en
+PowerShell (no necesita permisos de administrador):
+
+```powershell
+schtasks /Create /TN "MemecoinSolanaBot" /TR "\"C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe\" \"C:\Users\perri\Documents\mi-proyecto\bot.py\"" /SC DAILY /ST 08:00
+```
+
+Para probarla manualmente sin esperar a las 8am:
+
+```powershell
+schtasks /Run /TN "MemecoinSolanaBot"
+```
+
+Para eliminarla si algún día ya no la quieres:
+
+```powershell
+schtasks /Delete /TN "MemecoinSolanaBot" /F
+```
+
+## 10. Limitaciones conocidas (léelas antes de confiar ciegamente en el bot)
+
+- **Universo de descubrimiento limitado**: DexScreener no ofrece un
+  endpoint gratuito que liste "todos los pares nuevos de Solana". El bot
+  combina `/token-profiles/latest/v1` y `/token-boosts/latest/v1|top/v1`
+  para descubrir candidatos, que en la práctica son sobre todo tokens con
+  perfil cargado o boosteados recientemente. Esto significa que puede haber
+  memecoins legítimos que el bot nunca llega a evaluar. Si en el futuro
+  quieres ampliar la cobertura, se puede añadir una lista de tokens
+  semilla o una API de pago con endpoint de "nuevos pares".
+- **Solscan público está descontinuado**: `public-api.solscan.io` ya
+  devuelve 404; Solscan ahora exige API key de pago en `pro-api.solscan.io`.
+  Por eso el respaldo de holders usa el RPC público de Solana en su lugar.
+- **RPC público de Solana limita `getTokenLargestAccounts`**: el nodo
+  público (`api.mainnet-beta.solana.com`) devuelve 429 con frecuencia en
+  ese método. El bot reintenta con backoff, pero si sigue fallando, el
+  token se descarta por falta de datos en vez de asumir que es seguro.
+- **RugCheck limita ~15 requests/minuto**: por eso el bot primero
+  preselecciona candidatos con datos baratos de DexScreener (liquidez,
+  volumen, edad) antes de gastar ese cupo consultando seguridad.
+- **"Momentum de holders" necesita al menos 2 corridas**: la primera vez
+  que un token aparece, no hay dato del día anterior, así que ese
+  componente del score queda neutral (50/100) hasta la segunda corrida.
+
+## 11. Solución de problemas
+
+- **"Faltan TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID en .env"**: revisa que el
+  archivo se llame exactamente `.env` (no `.env.txt`) y esté en la raíz del
+  proyecto.
+- **No llega ningún mensaje pero el log no muestra error**: confirma que le
+  diste "Start" a tu bot al menos una vez (paso 5) y que el `chat_id` es
+  correcto.
+- **La tarea programada no genera log ni manda mensajes**: revisa
+  `data/bot.log`; si no se crea el archivo, la tarea probablemente no está
+  encontrando `bot.py` — verifica las rutas exactas en el paso 9.
+- **Quieres ver qué tokens se descartaron y por qué**: todos los motivos de
+  descarte se registran en `data/bot.log` (nivel INFO), token por token.
