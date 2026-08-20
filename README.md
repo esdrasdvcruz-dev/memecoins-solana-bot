@@ -22,7 +22,8 @@ cuenta antes de invertir un solo dólar.
 
 ```
 mi-proyecto/
-├── bot.py                    # Orquestador principal (python bot.py)
+├── bot.py                    # Orquestador principal del reporte diario (python bot.py)
+├── watch_wallet.py           # Vigila tu wallet y manda análisis en vivo al abrir una posición
 ├── config.py                 # Variables de entorno y umbrales de filtrado
 ├── scoring.py                # Filtros de confiabilidad + cálculo del score 0-100
 ├── telegram_report.py        # Formateo y envío del reporte por Telegram
@@ -30,9 +31,11 @@ mi-proyecto/
 │   ├── dexscreener.py        # Descubrimiento de tokens + datos de mercado
 │   ├── jupiter.py            # Descubrimiento adicional (recientes/trending/organic score)
 │   ├── rugcheck.py           # Score de seguridad, holders, mint/freeze authority
-│   └── solana_rpc.py         # Respaldo vía RPC de Solana si RugCheck no tiene el token
+│   ├── solana_rpc.py         # Respaldo vía RPC de Solana si RugCheck no tiene el token
+│   └── wallet.py             # Balances de tokens SPL de una wallet (para watch_wallet.py)
 ├── data/
 │   ├── history.json          # Historial local (para calcular momentum de holders)
+│   ├── wallet_positions.json # Último snapshot de balances de la wallet vigilada
 │   └── bot.log               # Log de cada corrida
 ├── requirements.txt
 ├── .env                      # Tus credenciales (NO se sube a git)
@@ -285,7 +288,63 @@ Para eliminarla si algún día ya no la quieres:
 schtasks /Delete /TN "MemecoinSolanaBot" /F
 ```
 
-## 10. Limitaciones conocidas (léelas antes de confiar ciegamente en el bot)
+## 10. Análisis en vivo al abrir una posición (`watch_wallet.py`)
+
+Axiom (y la mayoría de terminales de trading) no tiene una API pública para
+leer tus posiciones abiertas. En vez de integrarse con Axiom, `watch_wallet.py`
+vigila directamente tu wallet de Solana on-chain: cada vez que compras un
+token, éste queda en tu wallet, así que monitorear la wallet es más
+confiable.
+
+**Cómo funciona:**
+1. Cada 2 minutos (tarea programada `MemecoinWalletWatch`) revisa los
+   balances de tokens de tu wallet (`WALLET_ADDRESS` en `.env`) vía RPC de
+   Solana.
+2. Compara contra el último snapshot guardado en
+   `data/wallet_positions.json`. Cualquier token con balance > 0 que antes
+   estaba en 0 (o no existía) se trata como posición nueva.
+3. Corre el mismo análisis del reporte diario (DexScreener + RugCheck/RPC +
+   score) sobre ese token y te lo manda por Telegram al instante — **sin**
+   descartarlo aunque no pase los filtros de confiabilidad (la posición ya
+   está abierta, así que se informa igual, marcando qué filtros no pasaría).
+4. Avisa **una sola vez** por posición: mientras el token siga en la
+   wallet no se vuelve a avisar. Si lo vendes por completo (balance a 0) y
+   lo vuelves a comprar después, se vuelve a tratar como posición nueva.
+
+La primera vez que corre, guarda tus tenencias actuales como línea base
+**sin avisar** (para no notificar de posiciones que ya tenías antes de
+activar esta función).
+
+**Configurar `WALLET_ADDRESS`**: agrega en `.env` la dirección **pública**
+de tu wallet (nunca la clave privada ni el seed phrase):
+```
+WALLET_ADDRESS=tu_direccion_publica_de_solana
+```
+
+**Probar manualmente:**
+```powershell
+python watch_wallet.py
+```
+
+**Tarea programada** (ya configurada en esta máquina, `MemecoinWalletWatch`,
+cada 2 minutos, `pythonw.exe` sin ventana). Para recrearla desde cero:
+```powershell
+schtasks /Create /TN "MemecoinWalletWatch" /TR "\"C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe\" \"C:\Users\perri\Documents\mi-proyecto\watch_wallet.py\"" /SC MINUTE /MO 2 /ST 00:00
+```
+```powershell
+$settings = New-ScheduledTaskSettingsSet `
+    -StartWhenAvailable `
+    -DontStopOnIdleEnd `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+
+Set-ScheduledTask -TaskName "MemecoinWalletWatch" -Settings $settings
+```
+Para eliminarla: `schtasks /Delete /TN "MemecoinWalletWatch" /F`
+
+## 11. Limitaciones conocidas (léelas antes de confiar ciegamente en el bot)
 
 - **Universo de descubrimiento limitado**: DexScreener no ofrece un
   endpoint gratuito que liste "todos los pares nuevos de Solana". El bot
@@ -309,7 +368,7 @@ schtasks /Delete /TN "MemecoinSolanaBot" /F
   que un token aparece, no hay dato del día anterior, así que ese
   componente del score queda neutral (50/100) hasta la segunda corrida.
 
-## 11. Solución de problemas
+## 12. Solución de problemas
 
 - **"Faltan TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID en .env"**: revisa que el
   archivo se llame exactamente `.env` (no `.env.txt`) y esté en la raíz del
@@ -322,3 +381,8 @@ schtasks /Delete /TN "MemecoinSolanaBot" /F
   encontrando `bot.py` — verifica las rutas exactas en el paso 9.
 - **Quieres ver qué tokens se descartaron y por qué**: todos los motivos de
   descarte se registran en `data/bot.log` (nivel INFO), token por token.
+- **`watch_wallet.py` no detecta una posición nueva**: revisa que
+  `WALLET_ADDRESS` en `.env` sea la dirección correcta y que la compra ya
+  se haya confirmado on-chain (puede tardar unos segundos). También
+  confirma en `data/bot.log` que la tarea `MemecoinWalletWatch` esté
+  corriendo cada 2 minutos.

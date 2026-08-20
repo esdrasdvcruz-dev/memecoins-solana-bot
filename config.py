@@ -25,6 +25,10 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 # --- Cadena a analizar ---
 CHAIN_ID = "solana"
 
+# --- Wallet a vigilar para análisis en vivo (watch_wallet.py) ---
+WALLET_ADDRESS = os.getenv("WALLET_ADDRESS", "")
+WALLET_POSITIONS_FILE = DATA_DIR / "wallet_positions.json"
+
 # --- Filtros de confiabilidad (requisito #2) ---
 MIN_LIQUIDITY_USD = float(os.getenv("MIN_LIQUIDITY_USD", 50_000))
 MIN_VOLUME_24H_USD = float(os.getenv("MIN_VOLUME_24H_USD", 100_000))

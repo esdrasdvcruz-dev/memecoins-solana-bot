@@ -12,6 +12,7 @@ venv/
 # Datos y logs generados en tiempo de ejecución (no son código fuente)
 data/history.json
 data/bot.log
+data/wallet_positions.json
 
 # Editor / OS
 .vscode/

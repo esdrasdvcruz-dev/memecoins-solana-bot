@@ -130,6 +130,76 @@ def send_error_alert(error_traceback: str) -> None:
     _send_message(text)
 
 
+def format_live_analysis_message(token: dict, fail_reasons: list[str] | None) -> str:
+    name = html.escape(str(token.get("name") or "?"))
+    symbol = html.escape(str(token.get("symbol") or "?"))
+    address = token.get("address", "")
+    url = token.get("url") or f"https://dexscreener.com/solana/{token.get('pair_address', address)}"
+
+    lines = [
+        "\U0001f6a8 <b>Nueva posición detectada en tu wallet</b>",
+        f"<b>{name} (${symbol})</b>",
+    ]
+
+    score = token.get("score")
+    if score is not None:
+        lines.append(f"Score: <b>{score}/100</b>")
+
+    lines += [
+        f"\U0001f552 Edad: {_fmt_age(token.get('age_hours'))}",
+        f"\U0001f4b5 Precio: {_fmt_price(token.get('price_usd'))}",
+        f"\U0001f3e6 Market Cap: {_fmt_usd(token.get('market_cap'))}",
+        f"\U0001f4a7 Liquidez: {_fmt_usd(token.get('liquidity_usd'))}",
+        f"\U0001f4c8 Volumen 24h: {_fmt_usd(token.get('volume_24h'))}",
+        f"\U0001f4c9 Cambio 24h: {token.get('price_change_24h', 0):+.1f}%",
+        f"\U0001f465 Holders: {token.get('total_holders', 'N/D')}",
+    ]
+
+    security_score = (token.get("score_breakdown") or {}).get("security")
+    if security_score is not None:
+        lines.append(
+            f"\U0001f512 Seguridad (RugCheck): {security_score}/100 "
+            f"(top10 holders: {token.get('top10_holder_pct', 'N/D')}%, "
+            f"LP bloqueada: {token.get('lp_locked_pct', 'N/D')}%)"
+        )
+    else:
+        lines.append("\U0001f512 Seguridad: sin datos disponibles todavía (token muy nuevo)")
+
+    risks = token.get("risks") or []
+    if risks:
+        flags = "; ".join(html.escape(r["name"]) for r in risks if r.get("name"))
+        lines.append(f"\U0001f6a9 Banderas rojas: {flags}")
+
+    if fail_reasons:
+        reasons = "; ".join(html.escape(r) for r in fail_reasons)
+        lines.append(f"⚠️ <b>No pasaría los filtros de confiabilidad del bot:</b> {reasons}")
+    else:
+        lines.append("✅ Pasaría todos los filtros de confiabilidad del bot")
+
+    lines.append(f"\U0001f517 <a href=\"{html.escape(url)}\">Ver en DexScreener</a>")
+    lines.append(f"<code>{html.escape(address)}</code>")
+
+    return "\n".join(lines)
+
+
+def send_live_analysis(
+    token: dict, fail_reasons: list[str] | None = None, incomplete: bool = False
+) -> None:
+    """Manda el análisis en vivo de una posición recién detectada en la
+    wallet. `incomplete=True` cuando DexScreener todavía no tiene datos de
+    mercado del token (par demasiado nuevo)."""
+    if incomplete:
+        address = token.get("address", "")
+        _send_message(
+            "\U0001f6a8 <b>Nueva posición detectada en tu wallet</b>\n"
+            f"<code>{html.escape(address)}</code>\n"
+            "No se encontraron datos de mercado en DexScreener todavía "
+            "(par muy nuevo o sin liquidez indexada)."
+        )
+        return
+    _send_message(format_live_analysis_message(token, fail_reasons))
+
+
 def send_report(tokens: list[dict]) -> None:
     if not tokens:
         _send_message(
