@@ -98,8 +98,52 @@
   .legend .swatch { display: inline-flex; align-items: center; gap: 6px; }
   .legend .ring { width: 11px; height: 11px; border-radius: 50%; }
 
-  #chart-wrap { padding: 4px 12px 20px; }
+  #main-area { display: flex; gap: 14px; padding: 4px 12px 20px; align-items: flex-start; }
+  #chart-wrap { flex: 1; min-width: 0; }
   svg { width: 100%; height: 78vh; display: block; }
+
+  #list-panel {
+    width: 320px;
+    flex-shrink: 0;
+    background: #0d0f18;
+    border: 1px solid #1c2030;
+    border-radius: 14px;
+    max-height: 78vh;
+    overflow-y: auto;
+  }
+  #list-panel h2 {
+    font-size: 12.5px;
+    margin: 0;
+    padding: 12px 14px;
+    color: #8b90a0;
+    font-weight: 600;
+    border-bottom: 1px solid #1c2030;
+    position: sticky;
+    top: 0;
+    background: #0d0f18;
+  }
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #14161f;
+  }
+  .list-row:hover, .list-row.active { background: #151827; }
+  .list-row img, .list-row .fallback {
+    width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: #23273a; flex-shrink: 0;
+  }
+  .list-row .fallback { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+  .list-row .names { flex: 1; min-width: 0; }
+  .list-row .sym { font-weight: 700; font-size: 12.5px; color: #f4f5f7; }
+  .list-row .nm { font-size: 10.5px; color: #6c7185; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-row .chg { font-size: 11.5px; width: 54px; text-align: right; flex-shrink: 0; }
+  .list-row .chg.up { color: #51cf66; }
+  .list-row .chg.down { color: #ff6b6b; }
+  .list-row .scorepill {
+    font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 7px; flex-shrink: 0;
+  }
   .bubble { cursor: pointer; }
   .bubble .bg { filter: blur(0.4px); }
   .bubble .ring.passed { stroke-width: 2.2px; }
@@ -154,7 +198,7 @@
 <body>
 <header>
   <h1>&#129749; Mapa de burbujas &mdash; Memecoins Solana</h1>
-  <span class="meta">20/08/2026 21:22 &middot; 91 tokens evaluados &middot; 25 pasaron los filtros &middot; se actualiza sola cada 5 min</span>
+  <span class="meta">20/08/2026 21:53 &middot; 91 tokens evaluados &middot; 25 pasaron los filtros &middot; se actualiza sola cada 5 min</span>
 </header>
 <div id="ranking"></div>
 <div id="controls">
@@ -166,7 +210,13 @@
     <span class="swatch"><span class="ring" style="border:2px dashed #fff;"></span> No pasa</span>
   </div>
 </div>
-<div id="chart-wrap"><svg id="chart" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div id="main-area">
+  <div id="chart-wrap"><svg id="chart" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <div id="list-panel">
+    <h2>Tokens en tendencia (por score)</h2>
+    <div id="list-body"></div>
+  </div>
+</div>
 <div id="empty" style="display:none">Ningún token fue evaluado en la última corrida.</div>
 <div id="tooltip"></div>
 <script>
@@ -200,6 +250,7 @@ const W = 1600, H = 900;
 
 if (!TOKENS.length) {
   document.getElementById("empty").style.display = "block";
+  document.getElementById("main-area").style.display = "none";
 } else {
   // Escala logarítmica: el market cap de memecoins tiene disparidad extrema
   // (un token establecido puede tener 1000-10000x el cap de uno recién
@@ -285,6 +336,30 @@ if (!TOKENS.length) {
     g.append("text").attr("class", "sym").attr("y", 4).style("font-size", Math.min(d.r * 0.4, 15) + "px").text(d.data.symbol || "?");
   });
 
+  // --- Panel de tokens en tendencia (estilo bubblemaps.io) ---
+  const listBody = document.getElementById("list-body");
+  const rowByAddress = new Map();
+  [...TOKENS].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)).forEach(t => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+    const img = t.image_url
+      ? `<img src="${t.image_url}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'fallback',textContent:'${initials(t)}'}))">`
+      : `<div class="fallback">${initials(t)}</div>`;
+    const chg = t.price_change_24h;
+    const chgClass = chg > 0 ? "up" : chg < 0 ? "down" : "";
+    row.innerHTML =
+      img +
+      `<div class="names"><div class="sym">${t.symbol || "?"}</div><div class="nm">${t.name || ""}</div></div>` +
+      `<div class="chg ${chgClass}">${chg?.toFixed(1) ?? "N/D"}%</div>` +
+      `<div class="scorepill" style="color:${color(t.score ?? 0)};background:${color(t.score ?? 0)}22">${t.score ?? "N/D"}</div>`;
+    row.addEventListener("click", () => {
+      searchInput.value = t.symbol || t.name || "";
+      applyFilters();
+    });
+    listBody.appendChild(row);
+    rowByAddress.set(t.address, row);
+  });
+
   // --- Buscador + toggle "solo pasan filtros" ---
   const searchInput = document.getElementById("search");
   const onlyPassed = document.getElementById("onlyPassed");
@@ -296,9 +371,21 @@ if (!TOKENS.length) {
       const matchesFilter = !onlyPassed.checked || t.passed;
       return !(matchesSearch && matchesFilter);
     });
+    rowByAddress.forEach((row, addr) => {
+      const t = TOKENS.find(x => x.address === addr);
+      const matchesSearch = !q || (t.symbol || "").toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q);
+      row.classList.toggle("active", !!q && matchesSearch);
+    });
   }
   searchInput.addEventListener("input", applyFilters);
   onlyPassed.addEventListener("change", applyFilters);
+
+  // --- Deep link desde Telegram: ?q=SYMBOL resalta ese token al abrir ---
+  const initialQuery = new URLSearchParams(location.search).get("q");
+  if (initialQuery) {
+    searchInput.value = initialQuery;
+    applyFilters();
+  }
 }
 </script>
 </body>
