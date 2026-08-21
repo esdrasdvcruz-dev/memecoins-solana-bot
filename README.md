@@ -24,6 +24,7 @@ cuenta antes de invertir un solo dólar.
 mi-proyecto/
 ├── bot.py                    # Orquestador principal del reporte diario (python bot.py)
 ├── watch_wallet.py           # Vigila tu wallet y manda análisis en vivo al abrir una posición
+├── dashboard.py               # Genera dashboard.html (mapa de burbujas de tokens evaluados)
 ├── config.py                 # Variables de entorno y umbrales de filtrado
 ├── scoring.py                # Filtros de confiabilidad + cálculo del score 0-100
 ├── telegram_report.py        # Formateo y envío del reporte por Telegram
@@ -37,6 +38,7 @@ mi-proyecto/
 │   ├── history.json          # Historial local (para calcular momentum de holders)
 │   ├── wallet_positions.json # Último snapshot de balances de la wallet vigilada
 │   └── bot.log               # Log de cada corrida
+├── dashboard.html             # Mapa de burbujas generado (se sobrescribe cada corrida)
 ├── requirements.txt
 ├── .env                      # Tus credenciales (NO se sube a git)
 ├── .env.example               # Plantilla del .env
@@ -194,7 +196,40 @@ que ir a revisar el log a mano.
 - **30% Liquidez**: escala logarítmica entre el mínimo exigido ($50k) y
   $1M de liquidez.
 
-## 9. Programar la ejecución diaria a las 8am (Windows)
+## 9. Mapa de burbujas de tokens (`dashboard.html`)
+
+Cada corrida de `bot.py` genera (o sobrescribe) `dashboard.html` en la raíz
+del proyecto: un mapa de burbujas (estilo bubblemaps.io) con **todos** los
+candidatos evaluados en esa corrida, hayan pasado o no los filtros de
+confiabilidad (no solo el top 10 que se manda por Telegram).
+
+- **Cada burbuja** es un token, con su logo (si DexScreener lo tiene; si
+  no, un círculo con el símbolo como respaldo automático).
+- **Tamaño**: market cap (o liquidez si no hay market cap), en escala
+  logarítmica — sin eso, un token grande y establecido (ej. JUP) aplastaría
+  a todas las memecoins pequeñas hasta hacerlas invisibles.
+- **Anillo de color**: score 0-100, de rojo (riesgoso) a verde (seguro).
+- **Anillo sólido** = pasa todos los filtros de confiabilidad; **punteado**
+  = no pasa (igual se muestra, para tener panorama completo del mercado
+  analizado).
+- **Barra superior**: ranking de los 8 tokens con mejor score.
+- **Buscador**: filtra por nombre/símbolo en vivo.
+- **Toggle** "Solo los que pasan los filtros".
+- Pasar el mouse por encima de una burbuja muestra precio, market cap,
+  liquidez, volumen, holders, seguridad y por qué no pasó los filtros (si
+  aplica). Clic abre el token en DexScreener.
+
+Se sobrescribe en cada corrida diaria (no acumula historial entre días,
+solo la foto más reciente). Ábrelo haciendo doble clic — es un archivo
+HTML autocontenido (los datos van embebidos), solo necesita internet para
+cargar la librería de gráficos (D3.js) desde su CDN y los logos desde el
+CDN de DexScreener.
+
+**Probar manualmente**: corre `python bot.py` (o el flujo completo del
+`README`) y luego abre `dashboard.html` con doble clic o arrastrándolo a
+Chrome.
+
+## 10. Programar la ejecución diaria a las 8am (Windows)
 
 > **Estado en esta máquina**: la tarea `MemecoinSolanaBot` ya está creada y
 > configurada para correr "pase lo que pase":
@@ -288,7 +323,7 @@ Para eliminarla si algún día ya no la quieres:
 schtasks /Delete /TN "MemecoinSolanaBot" /F
 ```
 
-## 10. Análisis en vivo al abrir una posición (`watch_wallet.py`)
+## 11. Análisis en vivo al abrir una posición (`watch_wallet.py`)
 
 Axiom (y la mayoría de terminales de trading) no tiene una API pública para
 leer tus posiciones abiertas. En vez de integrarse con Axiom, `watch_wallet.py`
@@ -344,7 +379,7 @@ Set-ScheduledTask -TaskName "MemecoinWalletWatch" -Settings $settings
 ```
 Para eliminarla: `schtasks /Delete /TN "MemecoinWalletWatch" /F`
 
-## 11. Limitaciones conocidas (léelas antes de confiar ciegamente en el bot)
+## 12. Limitaciones conocidas (léelas antes de confiar ciegamente en el bot)
 
 - **Universo de descubrimiento limitado**: DexScreener no ofrece un
   endpoint gratuito que liste "todos los pares nuevos de Solana". El bot
@@ -368,7 +403,7 @@ Para eliminarla: `schtasks /Delete /TN "MemecoinWalletWatch" /F`
   que un token aparece, no hay dato del día anterior, así que ese
   componente del score queda neutral (50/100) hasta la segunda corrida.
 
-## 12. Solución de problemas
+## 13. Solución de problemas
 
 - **"Faltan TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID en .env"**: revisa que el
   archivo se llame exactamente `.env` (no `.env.txt`) y esté en la raíz del

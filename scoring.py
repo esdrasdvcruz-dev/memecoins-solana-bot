@@ -177,12 +177,18 @@ def score_token(token: dict, previous: dict | None) -> dict:
     }
 
 
-def evaluate_tokens(market_tokens: list[dict], security_by_address: dict[str, dict]) -> list[dict]:
-    """Combina datos de mercado + seguridad, aplica filtros, calcula score
-    y devuelve solo los tokens que pasan todos los filtros, ordenados por
-    score descendente."""
+def evaluate_tokens(
+    market_tokens: list[dict], security_by_address: dict[str, dict]
+) -> tuple[list[dict], list[dict]]:
+    """Combina datos de mercado + seguridad y calcula el score para todos
+    los candidatos con datos de seguridad disponibles (pase o no los
+    filtros). Devuelve (passed, evaluated):
+      - passed: solo los que pasan todos los filtros, ordenados por score
+        descendente (lo que se manda en el reporte de Telegram).
+      - evaluated: TODOS los evaluados, cada uno con 'passed' y
+        'fail_reasons' (para el mapa de calor de dashboard.py)."""
     history = load_history()
-    passed: list[dict] = []
+    evaluated: list[dict] = []
 
     for market in market_tokens:
         address = market["address"]
@@ -196,11 +202,13 @@ def evaluate_tokens(market_tokens: list[dict], security_by_address: dict[str, di
         fail_reasons = check_filters(token)
         if fail_reasons:
             logger.info("%s (%s) descartado: %s", token.get("symbol"), address, "; ".join(fail_reasons))
-            continue
 
         scored = score_token(token, history.get(address))
-        passed.append(scored)
+        scored["passed"] = not fail_reasons
+        scored["fail_reasons"] = fail_reasons
+        evaluated.append(scored)
 
+    passed = [t for t in evaluated if t["passed"]]
     passed.sort(key=lambda t: t["score"], reverse=True)
 
     # Actualiza el historial con el snapshot de hoy para todos los que pasaron filtros.
@@ -214,8 +222,8 @@ def evaluate_tokens(market_tokens: list[dict], security_by_address: dict[str, di
         }
     save_history(new_history)
 
-    logger.info("%d tokens pasaron todos los filtros de confiabilidad", len(passed))
-    return passed
+    logger.info("%d/%d tokens evaluados pasaron todos los filtros", len(passed), len(evaluated))
+    return passed, evaluated
 
 
 if __name__ == "__main__":
@@ -226,7 +234,7 @@ if __name__ == "__main__":
     market = dexscreener.get_market_data(addrs)
     preselected = cheap_prefilter(market)
     security = rugcheck.get_security_info_bulk([m["address"] for m in preselected])
-    results = evaluate_tokens(preselected, security)
+    results, _evaluated = evaluate_tokens(preselected, security)
 
     for t in results[:10]:
         print(

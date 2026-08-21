@@ -13,6 +13,7 @@ venv/
 data/history.json
 data/bot.log
 data/wallet_positions.json
+dashboard.html
 
 # Editor / OS
 .vscode/

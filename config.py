@@ -17,6 +17,7 @@ DATA_DIR.mkdir(exist_ok=True)
 
 HISTORY_FILE = DATA_DIR / "history.json"
 LOG_FILE = DATA_DIR / "bot.log"
+DASHBOARD_FILE = BASE_DIR / "dashboard.html"
 
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

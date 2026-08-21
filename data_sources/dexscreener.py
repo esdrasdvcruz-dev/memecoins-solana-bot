@@ -85,6 +85,7 @@ def _normalize_pair(pair: dict) -> dict:
     volume = pair.get("volume", {}) or {}
     price_change = pair.get("priceChange", {}) or {}
     txns = pair.get("txns", {}) or {}
+    info = pair.get("info") or {}
 
     return {
         "address": base.get("address"),
@@ -101,6 +102,7 @@ def _normalize_pair(pair: dict) -> dict:
         "dex_id": pair.get("dexId"),
         "pair_address": pair.get("pairAddress"),
         "url": pair.get("url"),
+        "image_url": info.get("imageUrl"),
     }
 
 
