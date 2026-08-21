@@ -25,6 +25,8 @@ mi-proyecto/
 ├── bot.py                    # Orquestador principal del reporte diario (python bot.py)
 ├── watch_wallet.py           # Vigila tu wallet y manda análisis en vivo al abrir una posición
 ├── dashboard.py               # Genera dashboard.html (mapa de burbujas de tokens evaluados)
+├── serve_dashboard.py         # Sirve dashboard.html por WiFi local (para verlo en el celular)
+├── abrir_mapa_movil.bat       # Doble clic = corre serve_dashboard.py sin abrir terminal a mano
 ├── config.py                 # Variables de entorno y umbrales de filtrado
 ├── scoring.py                # Filtros de confiabilidad + cálculo del score 0-100
 ├── telegram_report.py        # Formateo y envío del reporte por Telegram
@@ -228,6 +230,32 @@ CDN de DexScreener.
 **Probar manualmente**: corre `python bot.py` (o el flujo completo del
 `README`) y luego abre `dashboard.html` con doble clic o arrastrándolo a
 Chrome.
+
+### Abrirlo desde el celular (misma WiFi)
+
+`dashboard.html` es un archivo local en esta PC, así que el celular
+necesita alguna forma de llegar a él. La forma más simple sin copiar nada
+a mano cada vez:
+
+1. Con el celular conectado a la **misma red WiFi** que esta PC, haz doble
+   clic en `abrir_mapa_movil.bat` (o corre `python serve_dashboard.py`).
+2. La primera vez, Windows puede preguntar si permite que Python reciba
+   conexiones en la red — acepta (marca solo "redes privadas").
+3. La consola muestra una URL como `http://192.168.x.x:8642/` — ábrela en
+   el navegador del celular.
+4. Deja la ventana abierta mientras quieras poder verlo desde el celular;
+   ciérrala para apagar el servidor. Cada vez que recargues la página en
+   el celular ves la versión más reciente de `dashboard.html`.
+
+Por seguridad, `serve_dashboard.py` solo devuelve el contenido de
+`dashboard.html` sin importar qué ruta se pida — nunca expone el resto de
+la carpeta del proyecto (que incluye `.env` con tus credenciales de
+Telegram).
+
+Si quieres acceso desde fuera de tu WiFi (datos móviles) o que quede
+siempre disponible sin tener que abrir la ventana cada vez, se puede
+publicar en un hosting gratuito (ej. GitHub Pages) — pídeselo a Claude si
+te interesa.
 
 ## 10. Programar la ejecución diaria a las 8am (Windows)
 
