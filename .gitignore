@@ -15,6 +15,9 @@ data/bot.log
 data/wallet_positions.json
 dashboard.html
 
+# Worktree local de la rama gh-pages (usado por publish_dashboard.py)
+.gh-pages-worktree/
+
 # Editor / OS
 .vscode/
 .idea/

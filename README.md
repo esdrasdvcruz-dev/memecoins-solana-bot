@@ -25,6 +25,7 @@ mi-proyecto/
 ├── bot.py                    # Orquestador principal del reporte diario (python bot.py)
 ├── watch_wallet.py           # Vigila tu wallet y manda análisis en vivo al abrir una posición
 ├── dashboard.py               # Genera dashboard.html (mapa de burbujas de tokens evaluados)
+├── publish_dashboard.py       # Publica dashboard.html en GitHub Pages (vía deploy key SSH)
 ├── serve_dashboard.py         # Sirve dashboard.html por WiFi local (para verlo en el celular)
 ├── abrir_mapa_movil.bat       # Doble clic = corre serve_dashboard.py sin abrir terminal a mano
 ├── config.py                 # Variables de entorno y umbrales de filtrado
@@ -206,7 +207,7 @@ candidatos evaluados en esa corrida, hayan pasado o no los filtros de
 confiabilidad (no solo el top 10 que se manda por Telegram).
 
 - **Cada burbuja** es un token, con su logo (si DexScreener lo tiene; si
-  no, un círculo con el símbolo como respaldo automático).
+  no, un círculo semitransparente con el símbolo como respaldo automático).
 - **Tamaño**: market cap (o liquidez si no hay market cap), en escala
   logarítmica — sin eso, un token grande y establecido (ej. JUP) aplastaría
   a todas las memecoins pequeñas hasta hacerlas invisibles.
@@ -215,47 +216,97 @@ confiabilidad (no solo el top 10 que se manda por Telegram).
   = no pasa (igual se muestra, para tener panorama completo del mercado
   analizado).
 - **Barra superior**: ranking de los 8 tokens con mejor score.
-- **Buscador**: filtra por nombre/símbolo en vivo.
+- **Panel "Tokens en tendencia"** (a la derecha, estilo la lista de
+  bubblemaps.io): todos los tokens evaluados ordenados por score, con
+  logo, cambio 24h y score. Clic en una fila resalta esa burbuja en el
+  mapa (mismo mecanismo que el buscador).
+- **Buscador**: filtra por nombre/símbolo en vivo (también resalta la fila
+  correspondiente en el panel de tendencia).
 - **Toggle** "Solo los que pasan los filtros".
 - Pasar el mouse por encima de una burbuja muestra precio, market cap,
   liquidez, volumen, holders, seguridad y por qué no pasó los filtros (si
   aplica). Clic abre el token en DexScreener.
+- Se autorrefresca sola cada 5 minutos, así que dejarla abierta siempre
+  muestra los datos más recientes.
 
 Se sobrescribe en cada corrida diaria (no acumula historial entre días,
-solo la foto más reciente). Ábrelo haciendo doble clic — es un archivo
-HTML autocontenido (los datos van embebidos), solo necesita internet para
-cargar la librería de gráficos (D3.js) desde su CDN y los logos desde el
-CDN de DexScreener.
+solo la foto más reciente).
+
+### Dónde verlo
+
+**En la PC**: doble clic en `dashboard.html` (carpeta del proyecto), o
+arrastrándolo a Chrome.
+
+**Desde cualquier lugar (recomendado)**: el bot publica automáticamente
+una copia en `https://esdrasdvcruz-dev.github.io/memecoins-solana-bot/`
+después de cada corrida (ver "Publicación pública" abajo) — funciona desde
+el celular con datos móviles, no hace falta estar en la misma WiFi.
+
+**Desde el celular por WiFi local** (alternativa sin depender de
+internet/GitHub): con el celular en la misma red que esta PC, doble clic
+en `abrir_mapa_movil.bat` (o `python serve_dashboard.py`) y abre la URL
+`http://192.168.x.x:8642/` que muestra la consola. Por seguridad, ese
+servidor solo devuelve `dashboard.html` sin importar la ruta pedida, nunca
+expone el resto de la carpeta (que incluye `.env`).
+
+### Publicación pública (GitHub Pages) y link en Telegram
+
+Cada mensaje de token que manda el bot por Telegram (reporte diario y
+análisis en vivo de `watch_wallet.py`) incluye, junto al link de
+DexScreener, un link **"Ver en el mapa de burbujas"** que abre el mapa
+público con ese token resaltado automáticamente (usa `?q=SÍMBOLO` en la
+URL, que `dashboard.html` lee al cargar).
+
+Para que ese link funcione desde cualquier lugar (no solo en tu WiFi de
+casa), `dashboard.html` se publica automáticamente en GitHub Pages después
+de cada corrida, vía `publish_dashboard.py`:
+
+1. El repo de GitHub es **público** (GitHub Pages gratis lo requiere) — tu
+   `.env` con credenciales nunca se sube porque está en `.gitignore`, así
+   que eso queda a salvo igual.
+2. Existe una rama `gh-pages` en el repo que solo contiene un `index.html`
+   (copia de `dashboard.html`), publicada como sitio en
+   `https://esdrasdvcruz-dev.github.io/memecoins-solana-bot/`.
+3. `publish_dashboard.py` copia el `dashboard.html` recién generado al
+   worktree local `.gh-pages-worktree/index.html`, hace commit y push a
+   `gh-pages` — usando una **deploy key SSH dedicada** (solo puede escribir
+   en este repo, no tiene acceso al resto de tu cuenta de GitHub) para que
+   la tarea programada diaria pueda publicar sin que nadie esté presente
+   para pasar un login/token a mano.
+4. Si la publicación falla (sin internet, deploy key revocada, etc.) se
+   registra en `data/bot.log` pero **no interrumpe** la corrida: el
+   reporte de Telegram y el `dashboard.html` local se generan igual.
+
+**Recrear esto desde cero** (otra PC, deploy key revocada, etc.):
+```powershell
+ssh-keygen -t ed25519 -f ~/.ssh/memecoins_deploy_key -N '""' -C "memecoins-dashboard-deploy"
+```
+Agrega un bloque a `~/.ssh/config`:
+```
+Host github-memecoins-deploy
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/memecoins_deploy_key
+    IdentitiesOnly yes
+```
+Agrega la llave pública (`cat ~/.ssh/memecoins_deploy_key.pub`) como
+**Deploy key** en `github.com/<usuario>/<repo>/settings/keys`, marcando
+**"Allow write access"**. Luego crea el worktree y el remoto:
+```powershell
+git worktree add --orphan -b gh-pages .gh-pages-worktree
+# copia un dashboard.html generado como .gh-pages-worktree/index.html, luego:
+cd .gh-pages-worktree
+git add index.html
+git commit -m "Publica mapa de burbujas"
+git remote add deploy github-memecoins-deploy:<usuario>/<repo>.git
+git push deploy gh-pages
+```
+Y activa GitHub Pages en `settings/pages`: Source = "Deploy from a
+branch", Branch = `gh-pages` / `(root)`.
 
 **Probar manualmente**: corre `python bot.py` (o el flujo completo del
-`README`) y luego abre `dashboard.html` con doble clic o arrastrándolo a
-Chrome.
-
-### Abrirlo desde el celular (misma WiFi)
-
-`dashboard.html` es un archivo local en esta PC, así que el celular
-necesita alguna forma de llegar a él. La forma más simple sin copiar nada
-a mano cada vez:
-
-1. Con el celular conectado a la **misma red WiFi** que esta PC, haz doble
-   clic en `abrir_mapa_movil.bat` (o corre `python serve_dashboard.py`).
-2. La primera vez, Windows puede preguntar si permite que Python reciba
-   conexiones en la red — acepta (marca solo "redes privadas").
-3. La consola muestra una URL como `http://192.168.x.x:8642/` — ábrela en
-   el navegador del celular.
-4. Deja la ventana abierta mientras quieras poder verlo desde el celular;
-   ciérrala para apagar el servidor. Cada vez que recargues la página en
-   el celular ves la versión más reciente de `dashboard.html`.
-
-Por seguridad, `serve_dashboard.py` solo devuelve el contenido de
-`dashboard.html` sin importar qué ruta se pida — nunca expone el resto de
-la carpeta del proyecto (que incluye `.env` con tus credenciales de
-Telegram).
-
-Si quieres acceso desde fuera de tu WiFi (datos móviles) o que quede
-siempre disponible sin tener que abrir la ventana cada vez, se puede
-publicar en un hosting gratuito (ej. GitHub Pages) — pídeselo a Claude si
-te interesa.
+`README`) y luego abre `dashboard.html` con doble clic, o `python
+publish_dashboard.py` para forzar solo la publicación pública.
 
 ## 10. Programar la ejecución diaria a las 8am (Windows)
 

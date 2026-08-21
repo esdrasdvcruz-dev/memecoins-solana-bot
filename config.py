@@ -19,6 +19,9 @@ HISTORY_FILE = DATA_DIR / "history.json"
 LOG_FILE = DATA_DIR / "bot.log"
 DASHBOARD_FILE = BASE_DIR / "dashboard.html"
 
+# --- Publicación pública del dashboard (ver publish_dashboard.py) ---
+PUBLIC_DASHBOARD_URL = "https://esdrasdvcruz-dev.github.io/memecoins-solana-bot/"
+
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")

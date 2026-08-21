@@ -11,11 +11,12 @@ from __future__ import annotations
 import html
 import logging
 import time
+import urllib.parse
 from datetime import datetime, timezone
 
 import requests
 
-from config import HTTP_TIMEOUT, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from config import HTTP_TIMEOUT, PUBLIC_DASHBOARD_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,13 @@ def _fmt_age(hours: float | None) -> str:
     return f"{hours:.1f} horas"
 
 
+def _bubble_map_url(token: dict) -> str:
+    """Link al mapa de burbujas público, con el token resaltado en el
+    buscador automáticamente (ver el manejo de ?q= en dashboard.py)."""
+    query = token.get("symbol") or token.get("address") or ""
+    return f"{PUBLIC_DASHBOARD_URL}?q={urllib.parse.quote(str(query))}"
+
+
 def format_header(count: int) -> str:
     today = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y")
     return (
@@ -90,6 +98,7 @@ def format_token_message(token: dict, rank: int) -> str:
         lines.append("✅ Sin banderas rojas reportadas por RugCheck")
 
     lines.append(f"\U0001f517 <a href=\"{html.escape(url)}\">Ver en DexScreener</a>")
+    lines.append(f"\U0001fae7 <a href=\"{html.escape(_bubble_map_url(token))}\">Ver en el mapa de burbujas</a>")
     lines.append(f"<code>{html.escape(address)}</code>")
 
     return "\n".join(lines)
@@ -177,6 +186,7 @@ def format_live_analysis_message(token: dict, fail_reasons: list[str] | None) ->
         lines.append("✅ Pasaría todos los filtros de confiabilidad del bot")
 
     lines.append(f"\U0001f517 <a href=\"{html.escape(url)}\">Ver en DexScreener</a>")
+    lines.append(f"\U0001fae7 <a href=\"{html.escape(_bubble_map_url(token))}\">Ver en el mapa de burbujas</a>")
     lines.append(f"<code>{html.escape(address)}</code>")
 
     return "\n".join(lines)

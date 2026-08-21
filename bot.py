@@ -28,6 +28,7 @@ import traceback
 import config
 from dashboard import render_dashboard
 from data_sources import dexscreener, jupiter, rugcheck, solana_rpc
+from publish_dashboard import publish_dashboard
 from scoring import cheap_prefilter, evaluate_tokens
 from telegram_report import send_error_alert, send_report
 
@@ -80,6 +81,7 @@ def run() -> list[dict]:
         logger.warning("No se descubrieron tokens candidatos, se aborta esta corrida")
         send_report([])
         render_dashboard([], config.DASHBOARD_FILE)
+        publish_dashboard()
         return []
 
     market_tokens = dexscreener.get_market_data(addresses)
@@ -89,11 +91,13 @@ def run() -> list[dict]:
         logger.info("Ningún token pasó la preselección barata")
         send_report([])
         render_dashboard([], config.DASHBOARD_FILE)
+        publish_dashboard()
         return []
 
     security_by_address = get_security_info([t["address"] for t in preselected])
     passed, evaluated = evaluate_tokens(preselected, security_by_address)
     render_dashboard(evaluated, config.DASHBOARD_FILE)
+    publish_dashboard()
 
     top_n = passed[: config.TOP_N_REPORT]
     logger.info("Enviando reporte con %d tokens por Telegram", len(top_n))
