@@ -76,6 +76,7 @@ _TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <title>Mapa de burbujas - Memecoins Solana</title>
+<meta http-equiv="refresh" content="300">
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
   :root { color-scheme: dark; }
@@ -226,7 +227,7 @@ _TEMPLATE = """<!doctype html>
 <body>
 <header>
   <h1>&#129749; Mapa de burbujas &mdash; Memecoins Solana</h1>
-  <span class="meta">{{GENERATED_AT}} &middot; {{TOTAL}} tokens evaluados &middot; {{PASSED}} pasaron los filtros</span>
+  <span class="meta">{{GENERATED_AT}} &middot; {{TOTAL}} tokens evaluados &middot; {{PASSED}} pasaron los filtros &middot; se actualiza sola cada 5 min</span>
 </header>
 <div id="ranking"></div>
 <div id="controls">
