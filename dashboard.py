@@ -174,7 +174,7 @@ _TEMPLATE = """<!doctype html>
   #chart-wrap { padding: 4px 12px 20px; }
   svg { width: 100%; height: 78vh; display: block; }
   .bubble { cursor: pointer; }
-  .bubble .bg { }
+  .bubble .bg { filter: blur(0.4px); }
   .bubble .ring.passed { stroke-width: 2.2px; }
   .bubble .ring.failed { stroke-dasharray: 3 3; stroke-width: 2px; }
   .bubble text {
@@ -328,7 +328,8 @@ if (!TOKENS.length) {
   cell.append("circle")
     .attr("class", "bg")
     .attr("r", d => d.r)
-    .attr("fill", d => color(d.data.score ?? 0));
+    .attr("fill", d => color(d.data.score ?? 0))
+    .attr("fill-opacity", d => d.data.image_url ? 0.35 : 0.55);
 
   cell.each(function (d) {
     const t = d.data;
