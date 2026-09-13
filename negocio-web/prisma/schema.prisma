@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,8 +29,7 @@ model Product {
   updatedAt   DateTime    @updatedAt
 }
 
-// SQLite (usado en desarrollo) no soporta enums nativos de Prisma;
-// estos campos se validan como enums a nivel de aplicación con zod.
+// status y paymentMethod se validan como enums a nivel de aplicación con zod.
 // OrderStatus: PENDING_PAYMENT | PAID | PREPARING | READY_FOR_PICKUP | COMPLETED | CANCELLED
 // PaymentMethod: CARD | BANK_TRANSFER_MX | BANK_TRANSFER_INTL | CRYPTO
 

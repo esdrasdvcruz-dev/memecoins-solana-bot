@@ -19,14 +19,15 @@ confía en lo que envía el navegador.
 ## Requisitos
 
 - Node.js 20+ (ya instalado en esta máquina)
-- Una base de datos (SQLite para desarrollo, incluida; Postgres recomendado para producción)
+- Una base de datos Postgres (en este proyecto usamos [Neon](https://neon.tech) conectada vía
+  Vercel Storage — ver `.env` para la cadena de conexión ya configurada)
 
 ## Primeros pasos
 
 ```bash
 npm install
-cp .env.example .env   # ya existe un .env de desarrollo con SQLite
-npx prisma migrate dev --name init
+cp .env.example .env   # y completa DATABASE_URL con tu Postgres (ver Requisitos)
+npx prisma migrate dev
 npm run db:seed        # crea categorías/productos de ejemplo y el usuario admin
 npm run dev
 ```
@@ -54,10 +55,14 @@ antes de usar el sitio en producción.
 1. Crea una cuenta en https://panel.conekta.com
 2. Ve a **Desarrollo → API Keys** y copia tu **llave privada**.
 3. Configúrala en `.env` como `CONEKTA_PRIVATE_KEY`.
-4. Ve a **Webhooks**, agrega la URL `https://tu-dominio.com/api/webhooks/conekta` y define un
-   usuario/contraseña para autenticar las notificaciones. Ponlos en `.env` como
-   `CONEKTA_WEBHOOK_USER` y `CONEKTA_WEBHOOK_PASSWORD`.
-5. Empieza en modo de pruebas (test keys) y usa las [tarjetas de prueba de Conekta](https://developers.conekta.com/docs/tarjetas-de-prueba)
+4. Ve a **Desarrollador → Webhooks**, crea un webhook con la URL
+   `https://tu-dominio.com/api/webhooks/conekta` y selecciona los eventos `charge.paid`,
+   `charge.declined`, `charge.canceled` y `charge.refunded`.
+5. En la misma sección, pulsa **"Generar llave"** (llave de firma) y copia la llave pública
+   completa (incluye `-----BEGIN PUBLIC KEY-----` y `-----END PUBLIC KEY-----`) en `.env` como
+   `CONEKTA_WEBHOOK_PUBLIC_KEY`. Conekta firma cada webhook con RSA-SHA256; esta llave se usa para
+   verificar que la notificación realmente viene de Conekta.
+6. Empieza en modo de pruebas (test keys) y usa las [tarjetas de prueba de Conekta](https://developers.conekta.com/docs/tarjetas-de-prueba)
    antes de activar tu cuenta en modo producción (requiere verificación de tu negocio ante Conekta).
 
 ### NOWPayments (criptomonedas)
@@ -93,13 +98,22 @@ Genera un secreto propio y largo para `ADMIN_SESSION_SECRET` (por ejemplo con
 
 ## Desplegar a producción
 
-1. Usa una base de datos Postgres administrada (por ejemplo [Neon](https://neon.tech) o
-   [Supabase](https://supabase.com)) y actualiza `DATABASE_URL`. Cambia también el `provider` en
-   `prisma/schema.prisma` de `sqlite` a `postgresql`, y vuelve a correr
-   `npx prisma migrate dev` localmente para regenerar las migraciones antes de desplegar.
+El sitio ya está desplegado en Vercel: **https://negocio-web-psi.vercel.app** (proyecto
+`shakeandgo2026-4444/negocio-web`), con Postgres (Neon) conectado vía la pestaña **Storage** del
+proyecto. Para desplegar cambios nuevos:
+
+```bash
+npx vercel --prod
+```
+
+Si alguna vez necesitas volver a montar esto desde cero (otro proveedor, otra cuenta):
+
+1. Crea una base de datos Postgres (Neon, Supabase, etc.) y define `DATABASE_URL`.
 2. Despliega en [Vercel](https://vercel.com) (soporte nativo de Next.js) u otro proveedor compatible
    con Node.js.
 3. Define todas las variables de `.env.example` en el panel de variables de entorno de tu proveedor.
+   **Importante:** después de agregar o cambiar variables de entorno en Vercel, hay que volver a
+   desplegar — los despliegues existentes no las recogen automáticamente.
 4. Actualiza `NEXT_PUBLIC_SITE_URL` a tu dominio real (se usa para las URLs de retorno de los pagos).
 5. Registra las URLs de webhook reales (con tu dominio de producción) en Conekta y NOWPayments.
 
