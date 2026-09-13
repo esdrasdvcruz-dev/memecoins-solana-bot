@@ -3,7 +3,7 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { createHostedCheckoutOrder } from "@/lib/conekta";
-import { createCoinbaseCharge } from "@/lib/coinbase";
+import { createNowPaymentsInvoice } from "@/lib/nowpayments";
 
 const checkoutSchema = z.object({
   items: z
@@ -110,16 +110,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (paymentMethod === "CRYPTO") {
-      const { chargeId, hostedUrl } = await createCoinbaseCharge({
+      const { invoiceId, invoiceUrl } = await createNowPaymentsInvoice({
         orderId: order.id,
-        name: `Pedido ${order.id}`,
         description: `Pedido para recoger en tienda — ${customer.name}`,
         amountCents: totalCents,
-        currency: "MXN",
       });
 
-      await prisma.order.update({ where: { id: order.id }, data: { coinbaseChargeId: chargeId } });
-      return NextResponse.json({ orderId: order.id, redirectUrl: hostedUrl });
+      await prisma.order.update({ where: { id: order.id }, data: { nowPaymentsInvoiceId: invoiceId } });
+      return NextResponse.json({ orderId: order.id, redirectUrl: invoiceUrl });
     }
 
     // BANK_TRANSFER_INTL: flujo manual, sin pasarela automática.

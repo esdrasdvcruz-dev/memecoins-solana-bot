@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 :root {
-  --font-display: "Georgia", serif;
+  --font-display: "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 body {
-  background-color: #fbf7f1;
+  background-color: #fff5f1;
   color: #1c1b19;
 }
 

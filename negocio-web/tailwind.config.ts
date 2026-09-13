@@ -6,16 +6,16 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50: "#fbf7f1",
-          100: "#f3e9d9",
-          200: "#e6cfae",
-          300: "#d7ae7c",
-          400: "#c78a52",
-          500: "#b06a34",
-          600: "#8f4f2a",
-          700: "#723d24",
-          800: "#5c3122",
-          900: "#4c291f",
+          50: "#fff5f1",
+          100: "#ffe6db",
+          200: "#ffc8b0",
+          300: "#ffa47e",
+          400: "#fb7a52",
+          500: "#f2502e",
+          600: "#d63c1e",
+          700: "#ad2f18",
+          800: "#86271a",
+          900: "#6b2117",
         },
         ink: {
           50: "#f6f6f5",
@@ -31,7 +31,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ["var(--font-display)", "serif"],
+        display: ["var(--font-display)", "sans-serif"],
         sans: ["var(--font-sans)", "sans-serif"],
       },
       boxShadow: {

@@ -1,34 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyCoinbaseWebhookSignature } from "@/lib/coinbase";
+import { verifyNowPaymentsSignature } from "@/lib/nowpayments";
+
+const PAID_STATUSES = new Set(["confirmed", "sending", "finished"]);
+const FAILED_STATUSES = new Set(["failed", "expired"]);
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
-  const signature = req.headers.get("x-cc-webhook-signature");
+  const signature = req.headers.get("x-nowpayments-sig");
 
-  if (!verifyCoinbaseWebhookSignature(rawBody, signature)) {
+  if (!verifyNowPaymentsSignature(rawBody, signature)) {
     return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
 
   const payload = JSON.parse(rawBody);
-  const eventType = payload?.event?.type as string | undefined;
-  const chargeId = payload?.event?.data?.id as string | undefined;
+  const orderId = payload?.order_id as string | undefined;
+  const paymentStatus = payload?.payment_status as string | undefined;
 
-  if (!eventType || !chargeId) {
+  if (!orderId || !paymentStatus) {
     return NextResponse.json({ error: "Evento inválido" }, { status: 400 });
   }
 
-  const order = await prisma.order.findFirst({ where: { coinbaseChargeId: chargeId } });
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) {
     return NextResponse.json({ received: true });
   }
 
-  if (eventType === "charge:confirmed") {
-    if (order.status === "PENDING_PAYMENT") {
+  if (order.status === "PENDING_PAYMENT") {
+    if (PAID_STATUSES.has(paymentStatus)) {
       await prisma.order.update({ where: { id: order.id }, data: { status: "PAID" } });
-    }
-  } else if (eventType === "charge:failed" || eventType === "charge:resolved") {
-    if (order.status === "PENDING_PAYMENT" && eventType === "charge:failed") {
+    } else if (FAILED_STATUSES.has(paymentStatus)) {
       await prisma.order.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
     }
   }

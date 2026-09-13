@@ -3,22 +3,22 @@
  * nombre, horarios, dirección, redes sociales y textos de la página principal.
  */
 export const businessConfig = {
-  name: "Tu Negocio",
+  name: "ShakeandGo",
   tagline: "Alimentos y bebidas frescos, listos para recoger en tienda.",
   description:
     "Ordena en línea y recoge tu pedido en tienda. Aceptamos tarjeta, transferencia bancaria (nacional e internacional) y criptomonedas.",
-  address: "Calle Ejemplo 123, Colonia Centro, Ciudad, México",
-  phone: "+52 55 0000 0000",
-  whatsapp: "+52 55 0000 0000",
-  email: "contacto@tunegocio.com",
+  address: "Calz. de Tlalpan 5055, local 5, Tlalpan Centro II, Tlalpan, 14090 Ciudad de México, CDMX",
+  phone: "+52 55 2173 7435",
+  whatsapp: "+52 55 2173 7435",
+  email: "shakeandgo2026@gmail.com",
   hours: [
-    { day: "Lunes a viernes", time: "9:00 am – 8:00 pm" },
-    { day: "Sábado", time: "10:00 am – 6:00 pm" },
+    { day: "Lunes a sábado", time: "8:00 am – 3:00 pm" },
     { day: "Domingo", time: "Cerrado" },
   ],
+  // Aún sin confirmar: reemplaza con tus cuentas reales cuando las tengas.
   social: {
-    instagram: "https://instagram.com/tunegocio",
-    facebook: "https://facebook.com/tunegocio",
+    instagram: "",
+    facebook: "",
   },
   pickupIntervalMinutes: 15,
   pickupLeadTimeMinutes: 30,

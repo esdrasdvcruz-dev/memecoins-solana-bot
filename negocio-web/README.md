@@ -11,7 +11,7 @@ administración para gestionar pedidos y el menú.
 | Tarjeta de crédito/débito | [Conekta](https://conekta.com) — checkout hospedado (hosted checkout), redirección y confirmación automática por webhook. |
 | Transferencia bancaria (México / SPEI) | También vía Conekta hosted checkout. |
 | Transferencia internacional (SWIFT) | Flujo manual: se muestran tus datos bancarios y una referencia única; confirmas el pago manualmente desde el panel admin al recibir el comprobante. |
-| Criptomonedas | [Coinbase Commerce](https://commerce.coinbase.com) — checkout hospedado, confirmación automática por webhook. |
+| Criptomonedas | [NOWPayments](https://nowpayments.io) — checkout hospedado (invoice), confirmación automática por webhook (IPN). |
 
 Los precios y totales siempre se recalculan en el servidor a partir de la base de datos — nunca se
 confía en lo que envía el navegador.
@@ -60,15 +60,24 @@ antes de usar el sitio en producción.
 5. Empieza en modo de pruebas (test keys) y usa las [tarjetas de prueba de Conekta](https://developers.conekta.com/docs/tarjetas-de-prueba)
    antes de activar tu cuenta en modo producción (requiere verificación de tu negocio ante Conekta).
 
-### Coinbase Commerce (criptomonedas)
+### NOWPayments (criptomonedas)
 
-1. Crea una cuenta en https://commerce.coinbase.com
-2. Ve a **Settings → Security → API keys** y genera una API key. Ponla en `.env` como
-   `COINBASE_COMMERCE_API_KEY`.
-3. En la misma sección, configura un webhook con la URL
-   `https://tu-dominio.com/api/webhooks/coinbase` y copia el **shared secret** a
-   `COINBASE_COMMERCE_WEBHOOK_SECRET`.
-4. Configura a qué wallet(s) quieres que se liquiden los pagos recibidos.
+> Nota: originalmente se planeó usar Coinbase Commerce, pero Coinbase lo discontinuó para
+> autoservicio (lo fusionó en "Coinbase Business", que requiere contactar ventas). NOWPayments es
+> la alternativa con registro y API verdaderamente autoservicio.
+
+1. Crea una cuenta en https://nowpayments.io
+2. En tu cuenta, especifica tu **wallet de salida** (outcome wallet) — a dónde se enviarán las
+   criptomonedas que recibas.
+3. Ve a **Store Settings** y genera tu **API key**. Ponla en `.env` como `NOWPAYMENTS_API_KEY`.
+4. En la misma sección, genera el **IPN Secret key** y ponlo en `.env` como
+   `NOWPAYMENTS_IPN_SECRET` (se usa para verificar que los webhooks realmente vienen de NOWPayments).
+   La URL de callback que el sitio envía automáticamente es
+   `https://tu-dominio.com/api/webhooks/nowpayments`.
+5. Revisa en el [sandbox de NOWPayments](https://documenter.getpostman.com/view/7907941/T1LSCRHC)
+   qué monedas fiat admite para calcular el precio en cripto. El sitio usa `NOWPAYMENTS_PRICE_CURRENCY`
+   (por defecto `"mxn"`) — si tu cuenta no admite conversión desde pesos mexicanos, cambia esa
+   variable a `"usd"` en `.env`.
 
 ### Transferencia internacional (SWIFT)
 
@@ -92,7 +101,7 @@ Genera un secreto propio y largo para `ADMIN_SESSION_SECRET` (por ejemplo con
    con Node.js.
 3. Define todas las variables de `.env.example` en el panel de variables de entorno de tu proveedor.
 4. Actualiza `NEXT_PUBLIC_SITE_URL` a tu dominio real (se usa para las URLs de retorno de los pagos).
-5. Registra las URLs de webhook reales (con tu dominio de producción) en Conekta y Coinbase Commerce.
+5. Registra las URLs de webhook reales (con tu dominio de producción) en Conekta y NOWPayments.
 
 ## Estructura del proyecto
 
@@ -100,12 +109,12 @@ Genera un secreto propio y largo para `ADMIN_SESSION_SECRET` (por ejemplo con
 prisma/schema.prisma       Modelos: Category, Product, Order, OrderItem, AdminUser
 src/lib/business-config.ts Datos del negocio (nombre, horarios, dirección, etc.)
 src/lib/conekta.ts          Integración con Conekta (checkout + verificación de webhook)
-src/lib/coinbase.ts         Integración con Coinbase Commerce (charge + verificación de webhook)
+src/lib/nowpayments.ts      Integración con NOWPayments (invoice + verificación de IPN)
 src/lib/cart-context.tsx    Carrito de compras (persistido en localStorage)
 src/app/menu                Catálogo público
 src/app/checkout            Formulario de pedido + selección de método de pago
 src/app/pedido/[id]         Estado del pedido / instrucciones de pago
 src/app/admin                Panel de administración (pedidos, menú)
 src/app/api/checkout         Crea el pedido y arranca el pago
-src/app/api/webhooks         Confirman pagos automáticamente (Conekta, Coinbase)
+src/app/api/webhooks         Confirman pagos automáticamente (Conekta, NOWPayments)
 ```

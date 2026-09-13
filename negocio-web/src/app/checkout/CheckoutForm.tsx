@@ -28,7 +28,7 @@ const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; description: strin
   {
     value: "CRYPTO",
     label: "Criptomonedas",
-    description: "Pago procesado por Coinbase Commerce (BTC, ETH, USDC y más).",
+    description: "Pago procesado por NOWPayments (BTC, ETH, USDT y más).",
   },
 ];
 

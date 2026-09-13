@@ -47,7 +47,7 @@ model Order {
   totalCents         Int
   currency           String        @default("MXN")
   conektaOrderId     String?
-  coinbaseChargeId   String?
+  nowPaymentsInvoiceId String?
   transferReference  String?       @unique
   items              OrderItem[]
   createdAt          DateTime      @default(now())
