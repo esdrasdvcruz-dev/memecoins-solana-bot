@@ -3,12 +3,20 @@ import { prisma } from "@/lib/prisma";
 import { businessConfig } from "@/lib/business-config";
 import ProductCard from "@/components/ProductCard";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
-  const featured = await prisma.product.findMany({
-    where: { available: true },
-    take: 3,
-    orderBy: { createdAt: "asc" },
-  });
+  let featured: Awaited<ReturnType<typeof prisma.product.findMany>> = [];
+  try {
+    featured = await prisma.product.findMany({
+      where: { available: true },
+      take: 3,
+      orderBy: { createdAt: "asc" },
+    });
+  } catch {
+    // Si la base de datos aún no está configurada (p. ej. recién desplegado),
+    // la página principal se muestra igual, solo sin la sección de destacados.
+  }
 
   return (
     <div>

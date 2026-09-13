@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 const CONEKTA_API_URL = "https://api.conekta.io";
 
 type LineItem = {
@@ -73,13 +75,20 @@ export async function createHostedCheckoutOrder(params: CreateHostedCheckoutPara
   };
 }
 
-export function verifyConektaWebhookAuth(authorizationHeader: string | null): boolean {
-  const expectedUser = process.env.CONEKTA_WEBHOOK_USER;
-  const expectedPassword = process.env.CONEKTA_WEBHOOK_PASSWORD;
-  if (!expectedUser || !expectedPassword) return false;
-  if (!authorizationHeader?.startsWith("Basic ")) return false;
+// Conekta firma cada webhook con RSA-SHA256 sobre el cuerpo crudo (UTF-8) de la
+// petición, enviando la firma en base64 en el header "Digest". Se verifica con la
+// llave pública que genera el panel (Desarrollador -> Webhooks -> Llave de firma).
+// https://developers.conekta.com/docs/autenticaci%C3%B3n-webhooks
+export function verifyConektaWebhookSignature(rawBody: string, digestHeader: string | null): boolean {
+  const publicKey = process.env.CONEKTA_WEBHOOK_PUBLIC_KEY;
+  if (!publicKey || !digestHeader) return false;
 
-  const decoded = Buffer.from(authorizationHeader.slice(6), "base64").toString("utf-8");
-  const [user, password] = decoded.split(":");
-  return user === expectedUser && password === expectedPassword;
+  try {
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(rawBody, "utf8");
+    verifier.end();
+    return verifier.verify(publicKey, digestHeader, "base64");
+  } catch {
+    return false;
+  }
 }

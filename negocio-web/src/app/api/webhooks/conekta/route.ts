@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyConektaWebhookAuth } from "@/lib/conekta";
+import { verifyConektaWebhookSignature } from "@/lib/conekta";
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (!verifyConektaWebhookAuth(authHeader)) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const rawBody = await req.text();
+  const digest = req.headers.get("digest");
+
+  if (!verifyConektaWebhookSignature(rawBody, digest)) {
+    return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
   }
 
-  const event = await req.json();
+  const event = JSON.parse(rawBody);
   const eventType = event?.type as string | undefined;
-  const conektaOrderId = event?.data?.object?.id as string | undefined;
+  const charge = event?.data?.object;
+  const conektaOrderId = charge?.order_id as string | undefined;
 
   if (!eventType || !conektaOrderId) {
     return NextResponse.json({ error: "Evento inválido" }, { status: 400 });
@@ -22,11 +25,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
-  if (eventType === "order.paid") {
+  if (eventType === "charge.paid") {
     if (order.status === "PENDING_PAYMENT") {
       await prisma.order.update({ where: { id: order.id }, data: { status: "PAID" } });
     }
-  } else if (eventType === "order.expired" || eventType === "order.canceled") {
+  } else if (eventType === "charge.declined" || eventType === "charge.canceled") {
     if (order.status === "PENDING_PAYMENT") {
       await prisma.order.update({ where: { id: order.id }, data: { status: "CANCELLED" } });
     }
