@@ -75,15 +75,32 @@ export async function createHostedCheckoutOrder(params: CreateHostedCheckoutPara
   };
 }
 
+// El panel de Conekta entrega la llave pública "aplastada" en una sola línea, pero
+// el decodificador PEM de Node/OpenSSL exige saltos de línea cada 64 caracteres en
+// el cuerpo base64. Sin esto, crypto.createVerify falla con
+// "DECODER routines::unsupported" y la verificación siempre da falso.
+function normalizePem(key: string): string {
+  const match = key
+    .replace(/\r/g, "")
+    .match(/-----BEGIN ([A-Z ]+)-----\s*([\s\S]*?)\s*-----END \1-----/);
+  if (!match) return key;
+
+  const [, label, body] = match;
+  const compactBody = body.replace(/\s+/g, "");
+  const wrappedBody = compactBody.match(/.{1,64}/g)?.join("\n") ?? compactBody;
+  return `-----BEGIN ${label}-----\n${wrappedBody}\n-----END ${label}-----\n`;
+}
+
 // Conekta firma cada webhook con RSA-SHA256 sobre el cuerpo crudo (UTF-8) de la
 // petición, enviando la firma en base64 en el header "Digest". Se verifica con la
 // llave pública que genera el panel (Desarrollador -> Webhooks -> Llave de firma).
 // https://developers.conekta.com/docs/autenticaci%C3%B3n-webhooks
 export function verifyConektaWebhookSignature(rawBody: string, digestHeader: string | null): boolean {
-  const publicKey = process.env.CONEKTA_WEBHOOK_PUBLIC_KEY;
-  if (!publicKey || !digestHeader) return false;
+  const rawPublicKey = process.env.CONEKTA_WEBHOOK_PUBLIC_KEY;
+  if (!rawPublicKey || !digestHeader) return false;
 
   try {
+    const publicKey = normalizePem(rawPublicKey);
     const verifier = crypto.createVerify("RSA-SHA256");
     verifier.update(rawBody, "utf8");
     verifier.end();
