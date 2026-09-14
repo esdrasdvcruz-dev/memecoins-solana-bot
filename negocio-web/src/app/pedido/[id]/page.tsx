@@ -69,6 +69,12 @@ export default async function OrderStatusPage({
                 <dt>SWIFT</dt>
                 <dd>{process.env.INTL_BANK_SWIFT}</dd>
               </div>
+              {process.env.INTL_BANK_ACCOUNT_MXN && (
+                <div className="flex justify-between">
+                  <dt>Cuenta (solo pesos mexicanos)</dt>
+                  <dd>{process.env.INTL_BANK_ACCOUNT_MXN}</dd>
+                </div>
+              )}
               <div className="flex justify-between font-semibold">
                 <dt>Referencia (indícala en tu transferencia)</dt>
                 <dd>{order.transferReference}</dd>
