@@ -10,7 +10,7 @@ export const businessConfig = {
   address: "Calz. de Tlalpan 5055, local 5, Tlalpan Centro II, Tlalpan, 14090 Ciudad de México, CDMX",
   phone: "+52 55 2173 7435",
   whatsapp: "+52 55 2173 7435",
-  email: "shakeandgo2026@gmail.com",
+  email: "contacto@shakeandgo.mx",
   hours: [
     { day: "Lunes a sábado", time: "8:00 am – 3:00 pm" },
     { day: "Domingo", time: "Cerrado" },
