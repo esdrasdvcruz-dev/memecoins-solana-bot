@@ -96,9 +96,30 @@ en su pedido una vez que verifiques el comprobante.
 Genera un secreto propio y largo para `ADMIN_SESSION_SECRET` (por ejemplo con
 `openssl rand -hex 32`) antes de desplegar a producción. Nunca reutilices el valor de ejemplo.
 
+## Estado actual (13 de septiembre de 2026)
+
+- **Sitio en vivo:** https://www.shakeandgo.mx (dominio propio conectado vía Cloudflare DNS).
+- **Correo del negocio:** contacto@shakeandgo.mx (Cloudflare Email Routing).
+- **Los 4 métodos de pago fueron probados de extremo a extremo en producción** (tarjeta, SPEI,
+  SWIFT y cripto) y funcionan correctamente.
+- **Transferencia SWIFT:** ya tiene datos bancarios reales (Revolut) configurados en Vercel.
+- **NOWPayments:** hoy se corrigieron dos vacíos de configuración en el panel de NOWPayments
+  (Configuración → Notificaciones de pago instantáneas): se agregó la URL del webhook (antes
+  vacía) y se activó el modo **"Solo texto (All-Strings)"** para evitar problemas de precisión al
+  verificar la firma de los webhooks con números decimales. El código de verificación de firma ya
+  coincidía con el patrón oficial de NOWPayments para Node.js.
+- **Menú:** actualmente es un catálogo de ejemplo (shakes genéricos) porque el negocio aún no tiene
+  su menú real definido. **Pendiente:** reemplazarlo por los productos/precios reales del negocio
+  (desde `/admin/menu` o editando `prisma/seed.ts`).
+- **Pendiente en NOWPayments:** no hay ninguna wallet de retiro configurada todavía (Configuración
+  de pagos → Billeteras de pagos). Sin esto, las criptomonedas recibidas no tienen a dónde
+  transferirse; hay que agregar una wallet cuando el negocio esté listo para retirar fondos.
+- **Pendiente en Conekta:** falta subir el acta constitutiva u otro documento de verificación del
+  negocio para activar el modo producción real (actualmente en modo de pruebas/validación).
+
 ## Desplegar a producción
 
-El sitio ya está desplegado en Vercel: **https://negocio-web-psi.vercel.app** (proyecto
+El sitio ya está desplegado en Vercel: **https://www.shakeandgo.mx** (proyecto
 `shakeandgo2026-4444/negocio-web`), con Postgres (Neon) conectado vía la pestaña **Storage** del
 proyecto. Para desplegar cambios nuevos:
 
