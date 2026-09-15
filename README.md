@@ -21,7 +21,7 @@ cuenta antes de invertir un solo dólar.
 ## 1. Estructura del proyecto
 
 ```
-mi-proyecto/
+memecoins-solana-bot/
 ├── bot.py                    # Orquestador principal del reporte diario (python bot.py)
 ├── watch_wallet.py           # Vigila tu wallet y manda análisis en vivo al abrir una posición
 ├── dashboard.py               # Genera dashboard.html (mapa de burbujas de tokens evaluados)
@@ -71,7 +71,7 @@ python telegram_report.py
 Abre PowerShell en la carpeta del proyecto:
 
 ```powershell
-cd C:\Users\perri\Documents\mi-proyecto
+cd C:\Users\perri\Documents\memecoins-solana-bot
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -339,11 +339,11 @@ publish_dashboard.py` para forzar solo la publicación pública.
    ```
 7. **Agregar argumentos**:
    ```
-   C:\Users\perri\Documents\mi-proyecto\bot.py
+   C:\Users\perri\Documents\memecoins-solana-bot\bot.py
    ```
 8. **Iniciar en (opcional)**:
    ```
-   C:\Users\perri\Documents\mi-proyecto
+   C:\Users\perri\Documents\memecoins-solana-bot
    ```
 9. Siguiente → Finalizar.
 10. Busca la tarea recién creada en la lista, clic derecho →
@@ -363,7 +363,7 @@ Alternativa más rápida a los pasos de arriba, ejecutada una sola vez en
 PowerShell (no necesita permisos de administrador):
 
 ```powershell
-schtasks /Create /TN "MemecoinSolanaBot" /TR "\"C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe\" \"C:\Users\perri\Documents\mi-proyecto\bot.py\"" /SC DAILY /ST 08:00
+schtasks /Create /TN "MemecoinSolanaBot" /TR "\"C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe\" \"C:\Users\perri\Documents\memecoins-solana-bot\bot.py\"" /SC DAILY /ST 08:00
 ```
 
 Para probarla manualmente sin esperar a las 8am:
@@ -443,7 +443,7 @@ python watch_wallet.py
 **Tarea programada** (ya configurada en esta máquina, `MemecoinWalletWatch`,
 cada 2 minutos, `pythonw.exe` sin ventana). Para recrearla desde cero:
 ```powershell
-schtasks /Create /TN "MemecoinWalletWatch" /TR "\"C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe\" \"C:\Users\perri\Documents\mi-proyecto\watch_wallet.py\"" /SC MINUTE /MO 2 /ST 00:00
+schtasks /Create /TN "MemecoinWalletWatch" /TR "\"C:\Users\perri\AppData\Local\Python\pythoncore-3.14-64\pythonw.exe\" \"C:\Users\perri\Documents\memecoins-solana-bot\watch_wallet.py\"" /SC MINUTE /MO 2 /ST 00:00
 ```
 ```powershell
 $settings = New-ScheduledTaskSettingsSet `
