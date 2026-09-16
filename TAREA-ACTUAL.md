@@ -1,113 +1,86 @@
-# TAREA ACTUAL — Historial como serie temporal
+# PENDIENTES del bot de memecoins
 
-**Resuelta el 16 sep 2026.** Ver `## Verificación` al final para la evidencia
-de que la migración y el nuevo flujo funcionan. Se deja el resto del
-documento tal cual quedó escrito como referencia del plan original.
+Actualizado el 16 sep 2026. Lo de arriba es lo siguiente que toca.
 
-## El problema, con la evidencia
+## Hecho (no rehacer)
 
-`scoring.py::save_history()` reescribe `data/history.json` completo en cada
-corrida, y el valor de cada token es un dict con una sola lectura:
+- **Historial como serie temporal.** `data/historial.sqlite3`, tabla
+  `lecturas`, con índice `(address, ts)`. Las 249 lecturas de
+  `history.json` se migraron **conservando sus fechas originales**:
+  verificado, 25 días distintos del 20/08 al 16/09. `history.json` se
+  conserva intacto como respaldo. 12 pruebas en `test_history_store.py`.
+- **La lectura previa se busca por ventana de tiempo** (24h ± 6h), no por
+  "la última corrida". Si no hay nada en la ventana devuelve neutral en
+  vez de inventar un momentum.
+- **Tabla de trincheras.** Dos vistas en pestañas: Trincheras (tabla) y
+  Mapa de burbujas. La tabla se arma **en Python** y viaja escrita en el
+  HTML, así que la página se lee aunque d3 no cargue desde el CDN.
+  10 columnas, foto del token a la izquierda, montos compactos
+  (`$1.2M`), y `Riesgo` en una palabra (Seguro / Cuidado / Peligro)
+  fundiendo seguridad + LP bloqueada + top 10 holders, con el detalle en
+  el `title`.
 
-```json
-"LFEJTxJ9yi6ojG": { "total_holders": 29761, "volume_24h": 6492623.05,
-                    "price_usd": 0.002404, "timestamp": 1787227632.95 }
-```
+## 1. Panel "qué cambió desde ayer"
 
-249 tokens en el archivo. Lectura más antigua: 20/08/2026. Más nueva:
-16/09/2026. **27 días de corridas y solo queda la última foto de cada
-token.**
+Lo primero que uno quiere ver al abrir. Ya es posible porque el
+historial guarda serie.
 
-## Qué se quiere lograr
+Qué mostrar, comparando la corrida de hoy contra la de ayer:
+- tokens que **entraron** al grupo de los que pasan filtros
+- tokens que **salieron**
+- **saltos de score** de más de ~10 puntos, arriba o abajo
+- tokens **nuevos**, nunca vistos antes
 
-1. Que cada corrida **sume** una lectura, sin borrar las anteriores.
-2. Que `_holders_momentum_score()` compare contra la lectura **más cercana a
-   24 horas atrás**, no contra "la corrida anterior" (que pudo ser hace un
-   día o hace una semana).
-3. Que el dashboard pueda mostrar tendencia de 30 días por token. Ese es el
-   dato que este bot puede dar y que no se ve gratis en DexScreener.
+Va arriba de la tabla, en la vista de Trincheras. Usa
+`history_store.reading_near()` con 24h.
 
-## Cómo hacerlo
+## 2. Normalizar el momentum por las horas reales
 
-**SQLite, no JSON.** Un JSON que crece sin límite se vuelve lento y se
-corrompe entero si una escritura se interrumpe. Hay un módulo ya escrito y
-probado para exactamente esto en
-`C:\Users\perri\Documents\nft-signal-bot\src\db.py` — vale trasplantarlo en
-vez de escribirlo de cero.
+Hoy la ventana es rígida: 24h ± 6h. Si un día se salta la corrida, o si
+el bot corre dos veces el mismo día, no encuentra lectura y el momentum
+queda neutral. **Medido el 16 sep: de 80 tokens, 0 encontraron lectura
+previa en la ventana** — porque ese día el bot corrió a las 12:10 y a
+las 21:49, o sea 9.6h de separación.
 
-Forma sugerida: `data/historial.sqlite3`, tabla `lecturas` con
-`address, ts, total_holders, volume_24h, price_usd, liquidity_usd, score,
-passed`, índice sobre `(address, ts)`.
+Arreglo propuesto: tomar la lectura anterior **sea cual sea su
+antigüedad** y normalizar el crecimiento por las horas transcurridas
+(`crecimiento por 24h = crecimiento × 24 ÷ horas`). Así una lectura de
+9.6h y otra de 36h dan momentums comparables, y casi nunca sale neutral.
 
-## Obligatorio
+Lo actual es defendible (prefiere callarse antes que equivocarse), así
+que esto es mejora, no urgencia.
 
-- **Migrar las 249 lecturas de `history.json` a la tabla nueva ANTES de
-  cambiar el flujo.** Son 27 días de datos: no se pierden.
-- **No borrar `history.json`** hasta que la migración esté verificada.
-- **Buscar la lectura previa por ventana de tiempo**, no por "la última".
-  Si no hay lectura cerca de 24h atrás, devolver neutral (50) como hoy —
-  nunca inventar un momentum con una comparación de ventana equivocada.
-- **Escribir pruebas.** Este proyecto no tiene ninguna. Empezar por las
-  funciones nuevas del historial: que sume y no pise, que la migración no
-  pierda filas, que la búsqueda por ventana elija la lectura correcta, que
-  un archivo corrupto no tumbe la corrida.
-- **Verificar de verdad**: correr `python bot.py` una vez y confirmar que la
-  tabla ganó una lectura por token **sin** borrar las que ya estaban.
+## 3. Ruido en el log de `watch_wallet.py`
 
-## Prohibido
+Corre cada 2 minutos y escribe "Sin posiciones nuevas" siempre: ~720
+líneas al día. Cuando de verdad pase algo va a estar enterrado. Debe
+registrar solo cuando algo cambia.
 
-- Tocar `.env` o los valores de credenciales.
-- Subir `data/` al repositorio.
-- Cambiar los umbrales de los filtros. Funcionan: 36 de 90 tokens pasan.
-  Esta tarea es de almacenamiento de datos, no de calibración.
+## 4. Sparklines de 30 días — esperar
 
-## Lo que sigue, después de esto (no ahora)
+Tienen sentido cuando el historial junte ~30 días de serie. Al 16 sep
+hay 25 días acumulados, así que **alrededor del 20 de octubre de 2026**.
+No antes: una sparkline con 3 puntos engaña más de lo que informa.
 
-1. Tabla ordenable debajo del mapa de burbujas. Cada token ya trae 17 datos
-   y el mapa muestra 5 — por eso la página se ve vacía. No le falta
-   información, le falta mostrarla.
-2. Panel "qué cambió desde ayer": entradas y salidas del top, saltos de
-   score.
-3. Tabla base en el HTML antes de que corra d3, para que la página sirva
-   aunque el CDN falle o la conexión esté mala.
-4. Sparklines de 30 días — **solo tienen sentido cuando el historial ya
-   haya juntado 30 días de serie**, o sea un mes después de este arreglo.
+## 5. Ideas sin decidir
 
-## Lección que se paga cara (viene del bot de NFT, ya cerrado)
+- Ordenar por "riesgo" y por "entraron hoy" desde el buscador.
+- Enlace directo desde el reporte de Telegram a la fila del token en la
+  tabla (hoy el deep link `?q=SYMBOL` solo resalta en el mapa).
 
-Un filtro calibrado contra un número mal medido rechaza todo para siempre,
-y se ve exactamente igual que un mercado malo. Antes de mover un umbral,
-verificar que el número que mide esté bien medido.
+## Reglas que no cambian
 
-## Verificación
-
-Hecho en este orden, como pedía el "Obligatorio" de arriba:
-
-1. **Migración primero.** `python history_store.py` migró las 249 lecturas
-   de `history.json` a `data/historial.sqlite3` (tabla `lecturas`) antes de
-   tocar `scoring.py`. Correrla dos veces seguidas dio 249/249 y luego
-   0/249 nuevas — idempotente, no duplica. `history.json` no se borró ni se
-   modificó (se comprobó su mtime antes y después).
-2. **Cambio de flujo.** `scoring.py::evaluate_tokens()` y
-   `watch_wallet.py::analyze_new_position()` ahora usan
-   `HistoryStore.reading_near(address, hours_ago=24)` en vez de "la última
-   lectura que hubiera". Sin lectura en la ventana (±6h de tolerancia) →
-   `None` → `_holders_momentum_score()` devuelve neutral (50), sin inventar.
-3. **Corrida real, sin efectos visibles hacia afuera.** Se ejecutó el
-   descubrimiento + evaluación real (DexScreener, Jupiter, RugCheck) tal
-   como lo hace `bot.py`, pero sin llamar a `send_report()` ni a
-   `publish_dashboard()` (esos sí mandan un mensaje real por Telegram y
-   publican en GitHub Pages, y se prefirió no dispararlos sin confirmación
-   explícita). Resultado: 91 preseleccionados, 40 pasaron filtros — misma
-   calibración de siempre, sin tocarla. La base pasó de 249 a 289 filas
-   (249 + 40, exacto), y `history.json` siguió sin cambios.
-4. **Pruebas.** `test_history_store.py`, 12 pruebas, `python -m unittest
-   test_history_store` → OK. Cubren: sumar sin pisar (mismo token, dos
-   corridas, dos filas), búsqueda por ventana de 24h (elige la más cercana,
-   no la más nueva; respeta la tolerancia; `None` si no hay ninguna en
-   rango), y migración (todas las filas, no duplica al repetirla, conserva
-   el timestamp original, un JSON faltante o corrupto no tumba la corrida).
-
-Pendiente si se quiere ir más allá: correr `python bot.py` completo (con
-Telegram y publicación reales) para confirmar el flujo end-to-end — no se
-hizo en esta tarea por ser una acción visible hacia afuera.
+1. Credenciales en `.env`. `config.py` las lee con `os.getenv()` y no
+   guarda valores.
+2. `data/` no se sube al repositorio.
+3. RugCheck limita a ~15 peticiones por minuto. **Un 429 no se
+   reintenta**: insistir alarga el castigo. Hay un limitador con
+   enfriamiento listo para trasplantar en
+   `C:\Users\perri\Documents\nft-signal-bot\src\sources\base.py`.
+4. No mover los umbrales de los filtros sin antes verificar que el
+   número que miden esté bien medido. Lección del bot de NFT: un filtro
+   calibrado contra un número mal medido rechaza todo para siempre, y se
+   ve igual que un mercado malo.
+5. `python dashboard.py` escribe en `data/dashboard_ejemplo.html`, NO en
+   el dashboard real. El real solo lo regenera `bot.py` con datos
+   verdaderos.
