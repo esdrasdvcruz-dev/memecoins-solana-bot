@@ -38,7 +38,8 @@ memecoins-solana-bot/
 │   ├── solana_rpc.py         # Respaldo vía RPC de Solana si RugCheck no tiene el token
 │   └── wallet.py             # Balances de tokens SPL de una wallet (para watch_wallet.py)
 ├── data/
-│   ├── history.json          # Historial local (para calcular momentum de holders)
+│   ├── historial.sqlite3     # Historial local (una lectura por corrida, para momentum de holders)
+│   ├── history.json          # Formato viejo, ya no se escribe (respaldo migrado)
 │   ├── wallet_positions.json # Último snapshot de balances de la wallet vigilada
 │   └── bot.log               # Log de cada corrida
 ├── dashboard.html             # Mapa de burbujas generado (se sobrescribe cada corrida)
@@ -194,8 +195,8 @@ que ir a revisar el log a mano.
   seguro).
 - **30% Momentum**: promedio de (a) aceleración del volumen de la última
   hora comparado contra el promedio diario, y (b) crecimiento del número de
-  holders desde la corrida anterior del bot (usa `data/history.json` como
-  memoria local del día anterior).
+  holders contra la lectura más cercana a 24h atrás en `data/historial.sqlite3`
+  (sin lectura en esa ventana, momentum neutral).
 - **30% Liquidez**: escala logarítmica entre el mínimo exigido ($50k) y
   $1M de liquidez.
 

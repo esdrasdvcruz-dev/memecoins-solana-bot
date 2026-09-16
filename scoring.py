@@ -2,23 +2,23 @@
 Filtros de confiabilidad (requisito #2) y cálculo del score 0-100
 (requisito #3): seguridad 40%, momentum de volumen/holders 30%, liquidez 30%.
 
-También lleva un historial local (data/history.json) con el snapshot del
-día anterior por token, para poder calcular "momentum" real de holders de
-un día al siguiente (el bot corre una vez al día, así que comparar contra
-la corrida anterior es la señal de momentum más honesta que se puede tener
-sin pagar por una API con histórico).
+También lleva un historial local (data/historial.sqlite3, ver
+history_store.py) con una lectura por corrida por token, para poder
+calcular "momentum" real de holders contra la lectura más cercana a 24h
+atrás (el bot corre una vez al día, así que esa ventana es la señal de
+momentum más honesta que se puede tener sin pagar por una API con
+histórico).
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import math
 import time
 from typing import Any
 
 from config import (
-    HISTORY_FILE,
+    HISTORY_DB_FILE,
     MAX_TOP10_HOLDER_PCT,
     MIN_AGE_HOURS,
     MIN_HOLDERS,
@@ -26,27 +26,13 @@ from config import (
     MIN_LP_LOCKED_PCT,
     MIN_VOLUME_24H_USD,
 )
+from history_store import HistoryStore
 
 logger = logging.getLogger(__name__)
 
 LIQUIDITY_SCORE_FLOOR = MIN_LIQUIDITY_USD  # score 0 en el mínimo permitido
 LIQUIDITY_SCORE_CEIL = 1_000_000  # score 100 a partir de $1M de liquidez
-
-
-def load_history() -> dict[str, dict]:
-    if not HISTORY_FILE.exists():
-        return {}
-    try:
-        with open(HISTORY_FILE, encoding="utf-8") as fh:
-            return json.load(fh)
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("No se pudo leer el historial (%s), se ignora", exc)
-        return {}
-
-
-def save_history(history: dict[str, dict]) -> None:
-    with open(HISTORY_FILE, "w", encoding="utf-8") as fh:
-        json.dump(history, fh, indent=2)
+HOLDERS_MOMENTUM_WINDOW_HOURS = 24.0
 
 
 def _age_hours(pair_created_at_ms: int | None) -> float | None:
@@ -187,40 +173,46 @@ def evaluate_tokens(
         descendente (lo que se manda en el reporte de Telegram).
       - evaluated: TODOS los evaluados, cada uno con 'passed' y
         'fail_reasons' (para el mapa de calor de dashboard.py)."""
-    history = load_history()
     evaluated: list[dict] = []
 
-    for market in market_tokens:
-        address = market["address"]
-        security = security_by_address.get(address)
-        if security is None:
-            logger.info("%s (%s): sin datos de seguridad, descartado", market.get("symbol"), address)
-            continue
+    with HistoryStore(HISTORY_DB_FILE) as store:
+        for market in market_tokens:
+            address = market["address"]
+            security = security_by_address.get(address)
+            if security is None:
+                logger.info("%s (%s): sin datos de seguridad, descartado", market.get("symbol"), address)
+                continue
 
-        token = {**market, **security, "age_hours": _age_hours(market.get("pair_created_at_ms"))}
+            token = {**market, **security, "age_hours": _age_hours(market.get("pair_created_at_ms"))}
 
-        fail_reasons = check_filters(token)
-        if fail_reasons:
-            logger.info("%s (%s) descartado: %s", token.get("symbol"), address, "; ".join(fail_reasons))
+            fail_reasons = check_filters(token)
+            if fail_reasons:
+                logger.info("%s (%s) descartado: %s", token.get("symbol"), address, "; ".join(fail_reasons))
 
-        scored = score_token(token, history.get(address))
-        scored["passed"] = not fail_reasons
-        scored["fail_reasons"] = fail_reasons
-        evaluated.append(scored)
+            previous_row = store.reading_near(address, HOLDERS_MOMENTUM_WINDOW_HOURS)
+            previous = dict(previous_row) if previous_row else None
 
-    passed = [t for t in evaluated if t["passed"]]
-    passed.sort(key=lambda t: t["score"], reverse=True)
+            scored = score_token(token, previous)
+            scored["passed"] = not fail_reasons
+            scored["fail_reasons"] = fail_reasons
+            evaluated.append(scored)
 
-    # Actualiza el historial con el snapshot de hoy para todos los que pasaron filtros.
-    new_history = load_history()
-    for token in passed:
-        new_history[token["address"]] = {
-            "total_holders": token.get("total_holders"),
-            "volume_24h": token.get("volume_24h"),
-            "price_usd": token.get("price_usd"),
-            "timestamp": time.time(),
-        }
-    save_history(new_history)
+        passed = [t for t in evaluated if t["passed"]]
+        passed.sort(key=lambda t: t["score"], reverse=True)
+
+        # Suma una lectura nueva por cada token que pasó filtros hoy, sin
+        # tocar las lecturas de corridas anteriores.
+        for token in passed:
+            store.add_reading(
+                token["address"],
+                total_holders=token.get("total_holders"),
+                volume_24h=token.get("volume_24h"),
+                price_usd=token.get("price_usd"),
+                liquidity_usd=token.get("liquidity_usd"),
+                score=token.get("score"),
+                passed=True,
+                ts=time.time(),
+            )
 
     logger.info("%d/%d tokens evaluados pasaron todos los filtros", len(passed), len(evaluated))
     return passed, evaluated

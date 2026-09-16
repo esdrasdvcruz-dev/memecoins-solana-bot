@@ -11,6 +11,9 @@ venv/
 
 # Datos y logs generados en tiempo de ejecución (no son código fuente)
 data/history.json
+data/historial.sqlite3
+data/historial.sqlite3-wal
+data/historial.sqlite3-shm
 data/bot.log
 data/wallet_positions.json
 dashboard.html

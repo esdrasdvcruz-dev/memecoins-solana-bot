@@ -21,6 +21,7 @@ serve_dashboard.py      # sirve dashboard.html por WiFi local (para el celular)
 abrir_mapa_movil.bat    # doble clic = corre serve_dashboard.py
 config.py               # lee variables de entorno + umbrales de filtrado
 scoring.py              # filtros de confiabilidad + score 0-100 + historial
+history_store.py        # historial en SQLite: una lectura por corrida (ver abajo)
 telegram_report.py      # formato y envío del reporte
 data_sources/
   dexscreener.py        # descubrimiento + datos de mercado
@@ -29,9 +30,10 @@ data_sources/
   solana_rpc.py         # respaldo si RugCheck no tiene el token
   wallet.py             # balances SPL de una wallet
 data/
-  history.json          # historial (ver PROBLEMA CONOCIDO abajo)
-  wallet_positions.json # último snapshot de la wallet
-  bot.log               # log de cada corrida
+  historial.sqlite3     # historial real, tabla `lecturas` (una fila por corrida por token)
+  history.json           # formato viejo, ya no se escribe; se conserva como respaldo migrado
+  wallet_positions.json  # último snapshot de la wallet
+  bot.log                # log de cada corrida
 ```
 
 Cada módulo de `data_sources/` se puede correr solo para probarlo:
@@ -51,29 +53,26 @@ Cada módulo de `data_sources/` se puede correr solo para probarlo:
 El score es `0.4 x seguridad + 0.3 x momentum + 0.3 x liquidez`. El momentum
 es el promedio de momentum de volumen y momentum de holders.
 
-## PROBLEMA CONOCIDO — es la tarea prioritaria
+## Historial (resuelto el 16 sep 2026, ver TAREA-ACTUAL.md)
 
-**`data/history.json` guarda UNA sola lectura por token y la sobrescribe en
-cada corrida.** `save_history()` reescribe el archivo completo con
-`json.dump(..., "w")`, y el valor de cada token es un dict, no una lista:
+`data/history.json` guardaba UNA sola lectura por token y la sobrescribía en
+cada corrida (`json.dump(..., "w")` sobre un dict). 27 días de corridas
+diarias y solo sobrevivía la foto del último día.
 
-```json
-{ "total_holders": 29761, "volume_24h": 6492623.05,
-  "price_usd": 0.002404, "timestamp": 1787227632.95 }
-```
+Ahora `history_store.py` guarda cada corrida como una fila nueva en
+`data/historial.sqlite3` (tabla `lecturas`, índice en `(address, ts)`).
+`_holders_momentum_score()` ya no compara contra "la corrida anterior" (que
+podía ser de hace un día o de hace una semana): busca la lectura más cercana
+a 24h atrás (`HistoryStore.reading_near`, tolerancia ±6h) y devuelve neutral
+(50) si no hay ninguna en esa ventana.
 
-Medido el 16 sep 2026: 249 tokens, lectura más antigua del 20 de agosto,
-más nueva del 16 de septiembre. **27 días de corridas diarias y solo
-sobrevive la foto del último día.**
+Las 249 lecturas de `history.json` se migraron (`python history_store.py`,
+migración idempotente) y el archivo se conserva como respaldo — el flujo
+nuevo ya no le escribe. Pruebas en `test_history_store.py`.
 
-Consecuencias:
-1. `_holders_momentum_score()` compara contra "la corrida anterior", que
-   puede haber sido hace un día o hace una semana. No es una ventana fija.
-2. El dashboard no puede mostrar tendencia, solo el estado de hoy — y la
-   tendencia de 30 días es el único dato que este bot puede dar y que no se
-   ve gratis en DexScreener.
-
-Ver `TAREA-ACTUAL.md` para el plan de arreglo.
+Pendiente (no ahora, ver TAREA-ACTUAL.md): tabla ordenable en el dashboard,
+panel de qué cambió desde ayer, sparklines de 30 días (tienen sentido una
+vez que el historial nuevo junte un mes de datos).
 
 ## Reglas no negociables
 
@@ -108,7 +107,7 @@ Ver `TAREA-ACTUAL.md` para el plan de arreglo.
 
 - Repositorio git con remoto en GitHub, rama `main`.
 - **11 commits sin subir** al 16 sep 2026 (`git push`).
-- **Sin ninguna prueba automática.** 2,086 líneas que deciden en qué poner
-  dinero. Modelo a seguir para empezar: `C:\TradingBot\test_utilidades.py`
-  — un módulo sin dependencias pesadas, y cada prueba nombra en su docstring
-  el problema real que la provocó.
+- **Pruebas automáticas: solo `test_history_store.py` (12, todas pasan).**
+  El resto de las 2,086 líneas sigue sin probar. Modelo a seguir:
+  `C:\TradingBot\test_utilidades.py` — un módulo sin dependencias pesadas,
+  y cada prueba nombra en su docstring el problema real que la provocó.

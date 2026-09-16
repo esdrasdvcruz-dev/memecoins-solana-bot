@@ -15,7 +15,8 @@ load_dotenv(BASE_DIR / ".env")
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-HISTORY_FILE = DATA_DIR / "history.json"
+HISTORY_FILE = DATA_DIR / "history.json"  # formato viejo, ver TAREA-ACTUAL.md
+HISTORY_DB_FILE = DATA_DIR / "historial.sqlite3"
 LOG_FILE = DATA_DIR / "bot.log"
 DASHBOARD_FILE = BASE_DIR / "dashboard.html"
 

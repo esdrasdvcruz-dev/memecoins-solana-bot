@@ -38,7 +38,8 @@ import traceback
 import config
 from bot import get_security_info
 from data_sources import dexscreener, wallet
-from scoring import _age_hours, check_filters, load_history, score_token
+from history_store import HistoryStore
+from scoring import HOLDERS_MOMENTUM_WINDOW_HOURS, _age_hours, check_filters, score_token
 from telegram_report import send_error_alert, send_live_analysis
 
 _handlers = [logging.FileHandler(config.LOG_FILE, encoding="utf-8")]
@@ -85,8 +86,9 @@ def analyze_new_position(address: str) -> None:
     token["age_hours"] = _age_hours(token.get("pair_created_at_ms"))
 
     if security:
-        history = load_history()
-        token = score_token(token, history.get(address))
+        with HistoryStore(config.HISTORY_DB_FILE) as store:
+            previous_row = store.reading_near(address, HOLDERS_MOMENTUM_WINDOW_HOURS)
+        token = score_token(token, dict(previous_row) if previous_row else None)
         fail_reasons = check_filters(token)
     else:
         fail_reasons = ["sin datos de seguridad disponibles (ni RugCheck ni RPC)"]
