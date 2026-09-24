@@ -26,3 +26,6 @@ dashboard.html
 .idea/
 Thumbs.db
 desktop.ini
+
+# Vista previa local del dashboard (no versionar)
+/vista-previa-dashboard.html
